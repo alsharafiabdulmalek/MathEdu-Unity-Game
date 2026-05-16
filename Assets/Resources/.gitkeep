@@ -1,0 +1,2 @@
+# MathDatabase.asset is copied here by the editor menu so GameManager
+# auto-loads it via Resources.Load<MathDatabase>("MathDatabase").

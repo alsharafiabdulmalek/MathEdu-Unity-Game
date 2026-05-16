@@ -1,0 +1,2 @@
+# UI sprite assets go here (buttons, panels, frames).
+# Until then, DefaultSprite.cs generates rounded-rect and gradient sprites at runtime.

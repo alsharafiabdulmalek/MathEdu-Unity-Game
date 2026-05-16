@@ -1,0 +1,3 @@
+# By design, no prefabs are required. UIFactory builds the entire Canvas
+# tree from C# at runtime. Drop reusable prefabs here only if you start
+# baking custom hand-crafted layouts.

@@ -1,0 +1,2 @@
+# Background sprite assets go here (menu, learn, quiz, story, etc.)
+# Until then, UIFactory.CreateGradientBackground generates two-stop gradients at runtime.

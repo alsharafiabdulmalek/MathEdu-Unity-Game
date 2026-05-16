@@ -1,2 +1,337 @@
-# MathEdu-Unity-Game
-Unity 6000.4.4f1 mobile math education game for Grades 1–3. ScriptableObject-driven architecture with 5 learning modes (Learn, Practice, Quiz, Story, Speed Round) covering all core math subjects. Built for Android &amp; iOS.
+# MathEdu — Unity 6 Mobile Math Game
+
+> **Grades 1‑3 · 11 math subjects · 5 learning modes · ScriptableObject‑driven**
+>
+> A complete Unity **6000.4.4f1** mobile project (Android + iOS) that teaches
+> kids math through games. The entire UI is built procedurally from C# +
+> TextMeshPro, every piece of content lives in **ScriptableObjects**, and the
+> project ships with a runtime fallback so it works the moment you press
+> Play — even before any sprite art is added.
+
+---
+
+## Table of Contents
+
+1. [What's in the box](#whats-in-the-box)
+2. [Quick start](#quick-start)
+3. [Project structure](#project-structure)
+4. [Math curriculum](#math-curriculum)
+5. [Learning modes](#learning-modes)
+6. [Architecture overview](#architecture-overview)
+7. [Scene flow](#scene-flow)
+8. [Adding artwork (sprites you'll provide)](#adding-artwork)
+9. [Adding / editing questions](#adding--editing-questions)
+10. [Mobile build settings](#mobile-build-settings)
+11. [Editor menu reference](#editor-menu-reference)
+12. [Roadmap](#roadmap)
+
+---
+
+## What's in the box
+
+| Feature | Status |
+|---|---|
+| Grades 1–3, 11 subjects, 10 levels × 10 questions each | ✅ Procedurally generated, ~2,400+ questions |
+| ScriptableObjects: `MathDatabase`, `GradeData`, `SubjectData`, `LevelData`, `MathQuestion` | ✅ |
+| Player profile (JSON save + PlayerPrefs backup) | ✅ |
+| Procedural UI (TextMeshPro + uGUI Canvas), safe‑area aware | ✅ |
+| 5 learning modes: Learn, Practice, Quiz, Story, Speed Round | ✅ |
+| Star ratings (1–3), XP, badges, level unlocks | ✅ |
+| Procedural audio: correct/wrong/win/lose/tap/tick | ✅ |
+| Scene transitions with fade | ✅ |
+| Android + iOS player settings | ✅ |
+| Custom sprite art | ⏳ *Drop yours in `Assets/Sprites/`* |
+
+---
+
+## Quick start
+
+1. **Clone:**
+   ```bash
+   git clone https://github.com/alsharafiabdulmalek/MathEdu-Unity-Game.git
+   ```
+2. **Open in Unity Hub** with Unity **6000.4.4f1** (or any 6000.x). On first
+   load Unity will resolve the packages listed in `Packages/manifest.json` —
+   notably TextMeshPro. Accept the TMP Essentials import prompt if it appears.
+3. **Build the database & scenes** from the editor menu:
+   - `MathEdu → Build Default Database` (creates ~2,400 questions across all
+     grades / subjects / levels and a `MathDatabase.asset` in
+     `Assets/Resources` so it's loaded automatically at runtime).
+   - `MathEdu → Build All Scenes` (creates the 10 scenes under
+     `Assets/Scenes/` and registers them in `EditorBuildSettings`).
+4. **Open `Assets/Scenes/Bootstrap.unity` and press ▶**. The game flows
+   Bootstrap → MainMenu → LevelSelect → ModeSelect → (selected mode) →
+   Results.
+
+> If you skip step 3, the game still runs — `GameManager` builds a runtime
+> database in memory via `DatabaseBootstrapper`. The editor menu is only
+> needed if you want the question data visible in the Project window for
+> tuning.
+
+---
+
+## Project structure
+
+```
+Assets/
+├── Scripts/
+│   ├── Data/                  # ScriptableObject definitions
+│   │   ├── MathQuestion.cs
+│   │   ├── LevelData.cs
+│   │   ├── SubjectData.cs
+│   │   ├── GradeData.cs
+│   │   ├── MathDatabase.cs
+│   │   ├── PlayerProfile.cs
+│   │   └── GameSession.cs
+│   ├── Utility/
+│   │   ├── QuestionGenerator.cs       # Procedural math content per (grade, subject, level)
+│   │   ├── DatabaseBootstrapper.cs    # Runtime fallback database
+│   │   └── SaveSystem.cs              # JSON + PlayerPrefs persistence
+│   ├── Managers/
+│   │   ├── GameManager.cs             # Root singleton, holds DB + Profile
+│   │   ├── AudioManager.cs            # SFX, procedural tones
+│   │   ├── ProgressManager.cs         # Stars, XP, unlocks, badges
+│   │   └── UIManager.cs               # Scene transitions
+│   ├── UI/
+│   │   ├── UIFactory.cs               # Procedural Canvas/TMP builder
+│   │   ├── DefaultSprite.cs           # Procedural rounded-rect, gradient, circle sprites
+│   │   ├── SafeAreaHandler.cs
+│   │   ├── FadeOverlay.cs
+│   │   ├── AnswerButton.cs
+│   │   ├── StarRating.cs
+│   │   ├── ProgressBar.cs
+│   │   ├── Timer.cs
+│   │   ├── AnimatedFeedback.cs
+│   │   └── QuestionVisualRenderer.cs  # Clock, dots, fractions, etc.
+│   ├── Gameplay/
+│   │   └── GameplayManagerBase.cs     # Shared MCQ loop
+│   ├── Modes/
+│   │   ├── BootstrapManager.cs
+│   │   ├── MainMenuManager.cs
+│   │   ├── LevelSelectManager.cs
+│   │   ├── ModeSelectManager.cs
+│   │   ├── LearnModeManager.cs
+│   │   ├── PracticeModeManager.cs
+│   │   ├── QuizModeManager.cs
+│   │   ├── StoryModeManager.cs
+│   │   ├── SpeedRoundManager.cs
+│   │   └── ResultsManager.cs
+│   ├── Editor/
+│   │   ├── DatabaseBuilderMenu.cs     # MathEdu / Build Default Database
+│   │   └── SceneBuilderMenu.cs        # MathEdu / Build All Scenes
+│   ├── MathEdu.Runtime.asmdef
+│   └── Editor/MathEdu.Editor.asmdef
+├── ScriptableObjects/                 # Generated by the editor menu
+│   ├── MathDatabase.asset
+│   ├── Grades/Grade1 .. 3/
+│   ├── Subjects/
+│   └── Levels/
+├── Scenes/                            # Generated by the editor menu
+│   ├── Bootstrap.unity
+│   ├── MainMenu.unity
+│   ├── LevelSelect.unity
+│   ├── ModeSelect.unity
+│   ├── LearnMode.unity
+│   ├── PracticeMode.unity
+│   ├── QuizMode.unity
+│   ├── StoryMode.unity
+│   ├── SpeedRound.unity
+│   └── Results.unity
+├── Resources/
+│   └── MathDatabase.asset             # Auto-found by GameManager at runtime
+├── Sprites/                           # Drop your art here
+│   ├── Backgrounds/
+│   ├── UI/
+│   └── Characters/
+└── Prefabs/                           # Empty by design — UI is procedural
+```
+
+---
+
+## Math curriculum
+
+The procedural curriculum (in `QuestionGenerator.cs`) is grade‑appropriate
+and roughly Common‑Core‑flavoured:
+
+| Subject | Grade 1 | Grade 2 | Grade 3 |
+|---|---|---|---|
+| Counting | ✅ 1–20 | ✅ skip 2/5/10 | – |
+| Addition | ✅ within 20 | ✅ within 100 | ✅ 3‑digit |
+| Subtraction | ✅ within 20 | ✅ within 100 | ✅ 3‑digit |
+| Multiplication | – | ✅ x2, x5, x10 intro | ✅ tables 1–10 |
+| Division | – | – | ✅ within 100 |
+| Shapes | ✅ 2‑D | ✅ 2‑D + 3‑D | ✅ perimeter / area |
+| Patterns | ✅ AB / ABB | – | – |
+| Fractions | – | ✅ halves / thirds / quarters | ✅ equivalent fractions |
+| Measurement | ✅ compare | ✅ pick the unit | ✅ pick the unit |
+| Time | ✅ to the hour | ✅ to 5 minutes | ✅ to the minute |
+| Money | ✅ coin recognition | ✅ totals | ✅ making change |
+
+Each subject has **10 levels** with **10 questions** each. Question
+difficulty escalates with the level number. Each question is a `MathQuestion`
+with `prompt`, `options[4]`, `correctIndex`, `hint`, `explanation`,
+`difficulty`, and an optional `visual` payload (clock hands, fraction
+numerator/denominator, dot counts, etc.).
+
+---
+
+## Learning modes
+
+| Mode | Behaviour |
+|---|---|
+| **Learn** | Guided lesson with intro / example / tip, then 3 try‑it questions with hints always visible. No scoring, no timer. |
+| **Practice** | Untimed run through all 10 questions. Hints available. Mistakes do not penalise. |
+| **Quiz** | Timed challenge — `LevelData.quizSecondsPerQuestion` per question. Score = base + time bonus. No hints. |
+| **Story** | Same MCQ loop as Practice, wrapped in a narrative banner (`storyIntro`, `storyOutro`). Order preserved (not shuffled). |
+| **Speed Round** | Rapid‑fire — `LevelData.speedSecondsPerQuestion` per question. **One wrong answer ends the run.** Maximum survival score. |
+
+All five modes route to the same `Results` scene that:
+- Animates a 0→N star count‑up using `LevelData.ComputeStars(correct, total)`.
+- Shows the final score.
+- Records the result via `ProgressManager.CompleteLevel(...)` (which awards
+  XP, stars, badges, and unlocks the next level).
+
+---
+
+## Architecture overview
+
+```
+[GameManager] (DontDestroyOnLoad)
+   ├── MathDatabase         (from Resources OR built procedurally)
+   ├── PlayerProfile        (loaded by SaveSystem)
+   ├── GameSession          (grade / subject / level / mode selections)
+   ├── AudioManager         (auto-added)
+   ├── ProgressManager      (auto-added)
+   └── UIManager            (auto-added → scene transitions)
+```
+
+- **Self‑bootstrapping singletons.** Every scene contains exactly **one**
+  `[SceneRoot]` GameObject with the relevant `*Manager` script. Touching
+  `GameManager.Instance` lazily creates the root if it's missing, so any
+  scene can run standalone in the editor without manual wiring.
+- **Procedural UI.** No scene contains hand‑authored Canvas hierarchies —
+  every manager calls `UIFactory.CreateCanvas(...)` in `Start()` and builds
+  buttons, panels, text, layouts, and animations from code. This keeps the
+  YAML scene files tiny and merge‑friendly.
+- **Procedural fallback content.** If the `MathDatabase.asset` is missing
+  (or empty), `DatabaseBootstrapper.BuildInMemory()` constructs the entire
+  ~2,400‑question tree at runtime. You can ship without ever opening the
+  editor menu.
+- **Single save file** at `Application.persistentDataPath/player_profile.json`
+  with a redundant copy in PlayerPrefs for platforms with finicky file I/O.
+
+---
+
+## Scene flow
+
+```
+Bootstrap
+    │  (1.2 s splash)
+    ▼
+MainMenu  ────────────────► Grade buttons (1, 2, 3)
+                            Subject grid (per‑grade)
+    │
+    ▼ (tap subject)
+LevelSelect ──────────────► 10 level tiles (unlocked / 🔒)
+    │
+    ▼ (tap unlocked level)
+ModeSelect ───────────────► Learn / Practice / Quiz / Story / Speed
+    │
+    ▼ (tap mode)
+[Mode scene]  ────────────► MCQ loop with mode‑specific rules
+    │
+    ▼ (last question answered or fail)
+Results ──────────────────► Stars + score + Menu/Retry/Next
+```
+
+---
+
+## Adding artwork (sprites you'll provide)
+
+Until you drop real artwork in, the UI uses procedurally generated rounded
+rectangles, gradients, and circles via `DefaultSprite`. Here is the swap‑in
+plan once your sprite assets are ready:
+
+1. **Backgrounds.** Drop PNGs into `Assets/Sprites/Backgrounds/`. Edit
+   `UIFactory.CreateGradientBackground` (or add a `CreateImageBackground`
+   helper) to load the new sprite by name. Suggested files:
+   - `bg_menu.png`, `bg_learn.png`, `bg_quiz.png`, `bg_story.png`, etc.
+2. **Panels / buttons.** Place 9‑slice PNGs into `Assets/Sprites/UI/`, e.g.
+   `ui_card.png`, `ui_button.png`. In `UIFactory.CreateButton` /
+   `CreatePanel`, replace `DefaultSprite.RoundedRect(...)` with
+   `Resources.Load<Sprite>("UI/ui_button")`. Move the files to
+   `Assets/Resources/UI/` first so `Resources.Load` works without code
+   changes elsewhere.
+3. **Icons.** `SubjectData.icon` is already there — just assign a Sprite in
+   the Inspector. The Main Menu falls back to `iconEmoji` when no sprite is
+   set, so you can swap icons one subject at a time without breaking
+   anything.
+4. **TextMeshPro fonts.** The default TMP font is fine but you can drop a
+   custom `.asset` font under `Assets/Resources/Fonts/` and set it via a
+   single `TMP_FontAsset.defaultFontAsset` assignment in `BootstrapManager`.
+
+> The procedural defaults exist precisely so that *every* screen is fully
+> functional before you have artwork. Replacing them is a sprite‑by‑sprite
+> migration, not a rewrite.
+
+---
+
+## Adding / editing questions
+
+You have **three** options, from easiest to most powerful:
+
+1. **Tweak a single level by hand** after running
+   `MathEdu → Build Default Database`. Each `LevelData.asset` is fully
+   editable — change a question prompt or option directly in the Inspector.
+2. **Add a new question type** — extend `MathQuestion.QuestionVisual`,
+   render the new visual in `QuestionVisualRenderer.Show()`, and emit it
+   from `QuestionGenerator`.
+3. **Add a new subject** — add a value to `MathSubject`, write a generator
+   method in `QuestionGenerator`, list it in `SubjectsFor(grade)`, and
+   rebuild the database.
+
+All edits survive Unity restarts because the data lives in `.asset` files
+under `Assets/ScriptableObjects/`.
+
+---
+
+## Mobile build settings
+
+The included `ProjectSettings/ProjectSettings.asset` ships with:
+
+- Default orientation: **Portrait** (`defaultScreenOrientation: 0`)
+- Reference resolution: **1080 × 1920**
+- `applicationIdentifier`: `com.mathedu.game` (Android, iOS, Standalone)
+- Android: **min SDK 22** (Android 5.1)
+- Safe‑area aware UI via `SafeAreaHandler`
+
+**To build for Android:** `File → Build Profiles → Android → Build`.
+
+**To build for iOS:** `File → Build Profiles → iOS → Build` (requires a Mac
+host with Xcode 15+).
+
+---
+
+## Editor menu reference
+
+| Menu | What it does |
+|---|---|
+| `MathEdu / Build Default Database` | Generates `MathDatabase.asset` + all `GradeData / SubjectData / LevelData` under `Assets/ScriptableObjects/` and a copy under `Assets/Resources/`. |
+| `MathEdu / Build All Scenes` | Creates every `.unity` scene under `Assets/Scenes/` and registers them in Build Settings. |
+| `MathEdu / Wipe Generated Database` | Removes the generated folder + Resources copy. |
+| `MathEdu / Reset Player Progress` | Wipes the save file + PlayerPrefs. |
+
+---
+
+## Roadmap
+
+- 🎨 Plug in your sprite assets for backgrounds, buttons, characters
+- 🌍 Localisation (i18n keys already isolated in `QuestionGenerator`)
+- 📊 Per‑subject analytics dashboard
+- 👤 Multi‑profile support (file naming already partitioned)
+- 🏅 Daily streak rewards
+- 🧪 Adaptive Practice Mode that re‑surfaces previously missed questions
+
+---
+
+Built for kids who deserve great math games. PRs welcome.
