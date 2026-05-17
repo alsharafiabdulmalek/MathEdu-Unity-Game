@@ -11,6 +11,10 @@
 //   - Whether the questions are timed (override BuildHeaderExtras to add a Timer).
 //   - Hook points for OnCorrect / OnWrong / OnFinished if they need custom logic
 //     (e.g. Speed Round ending the run on first wrong answer).
+//
+// The base loop also:
+//   - Records elapsed seconds on GameSession (used by per-subject stats).
+//   - Fires VFXManager prefabs on correct / wrong (Epic Toon FX support).
 // -----------------------------------------------------------------------------
 
 using System.Collections;
@@ -54,6 +58,8 @@ namespace MathEdu.Gameplay
         protected int _score;
         protected bool _locked;
 
+        protected float _sessionStartTime;
+
         protected virtual void Start()
         {
             _ = GameManager.Instance;
@@ -67,15 +73,27 @@ namespace MathEdu.Gameplay
             _questions = new List<MathQuestion>(_level.questions);
             if (ShuffleQuestions) Shuffle(_questions);
 
+            // Reset per-session counters and timing.
+            GameManager.Instance.Session.ResetGameplay();
+            _sessionStartTime = Time.unscaledTime;
+
             BuildUI();
             ShowQuestion(0);
+        }
+
+        protected virtual void Update()
+        {
+            // Track real elapsed time on the GameSession so per-subject time
+            // stats are accurate even if frames stutter.
+            GameManager.Instance.Session.elapsedSeconds =
+                Time.unscaledTime - _sessionStartTime;
         }
 
         protected virtual void BuildUI()
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[GameplayCanvas]");
             _safeArea = safe;
-            UIFactory.CreateGradientBackground(safe, UIFactory.BgTop, UIFactory.BgBottom);
+            UIFactory.CreateThemedBackground(safe, "play");
 
             // Header
             var header = UIFactory.CreatePanel(safe,
@@ -233,6 +251,7 @@ namespace MathEdu.Gameplay
                 _correct++;
                 _score += ScoreForCorrect(q);
                 GameManager.Instance.Audio.PlayCorrect();
+                GameManager.Instance.VFX?.PlayCorrect();
                 _feedback.ShowCorrect(EncouragementCorrect());
                 OnCorrect(q);
             }
@@ -240,6 +259,7 @@ namespace MathEdu.Gameplay
             {
                 _wrong++;
                 GameManager.Instance.Audio.PlayWrong();
+                GameManager.Instance.VFX?.PlayWrong();
                 _feedback.ShowWrong(EncouragementWrong(q));
                 OnWrong(q);
                 if (StopOnFirstWrong) { StartCoroutine(FinishDelayed()); return; }
