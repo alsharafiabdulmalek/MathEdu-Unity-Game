@@ -4,9 +4,9 @@
 // Coordinates progress events: recording results, unlocking next levels,
 // awarding XP / badges, and persisting changes via SaveSystem.
 //
-// This is intentionally thin — it sits between the gameplay screens and
-// the PlayerProfile data, so future tweaks (e.g. an XP curve) live in one
-// place.
+// In addition to per-level state, ProgressManager now updates per-subject
+// statistics on PlayerProfile.subjectStats so the Parental Dashboard can read
+// the numbers directly without scanning the entire content tree.
 // -----------------------------------------------------------------------------
 
 using System;
@@ -31,10 +31,12 @@ namespace MathEdu.Managers
             var profile = GameManager.Instance.Profile;
             if (profile == null) return 0;
 
+            int wrong = Math.Max(0, total - correct);
             int stars = level.ComputeStars(correct, total);
+            bool firstCompletion = profile.GetOrCreate(level.levelId).timesPlayed == 0;
             profile.RecordResult(level.levelId, stars, score);
 
-            // XP scaled by stars
+            // XP scaled by stars (minimum 1× for a played-but-failed level).
             int xp = level.xpReward * Mathf.Max(1, stars);
             profile.xp += xp;
             OnXPGained?.Invoke(profile.xp);
@@ -44,6 +46,19 @@ namespace MathEdu.Managers
             {
                 profile.AwardBadge(level.badgeId);
                 OnBadgeAwarded?.Invoke(level.badgeId);
+            }
+
+            // Per-subject rollup for the Parental Dashboard.
+            var subj = GameManager.Instance.CurrentSubject;
+            if (subj != null)
+            {
+                profile.RecordSession(
+                    subjectKey: subj.SubjectKey,
+                    correct:    correct,
+                    wrong:      wrong,
+                    starsThisSession: stars,
+                    levelCompleted:   firstCompletion && stars > 0,
+                    seconds:    GameManager.Instance.Session.elapsedSeconds);
             }
 
             // Unlock next level in the same subject
