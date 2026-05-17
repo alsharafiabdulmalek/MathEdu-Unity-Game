@@ -123,8 +123,10 @@ namespace MathEdu.Managers
             var gradeBar = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.20f), new Vector2(1, 0.29f),
                 new Color(0, 0, 0, 0.25f), 0, "GradeBar");
+            // TMP doesn't expose an "UpperCenter" enum value — use Top (which
+            // anchors the text to the top of its rect and centers it horizontally).
             UIFactory.CreateText(gradeBar, "Choose your grade:", 32,
-                Color.white, TextAlignmentOptions.UpperCenter, "GradeLbl");
+                Color.white, TextAlignmentOptions.Top, "GradeLbl");
 
             var gradeRow = new GameObject("GradeRow",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup));
