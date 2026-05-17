@@ -14,6 +14,11 @@
 //
 // The base loop also:
 //   - Records elapsed seconds on GameSession (used by per-subject stats).
+//   - Tracks the longest correct streak (used by Speed Round badges + Results).
+//   - Pads or falls back when a LevelData is missing or has fewer than the
+//     desired number of questions, so we never crash mid-run.
+//   - Adds a Back button with "Quit this level?" confirmation and a Pause
+//     button (configurable per mode).
 //   - Fires VFXManager prefabs on correct / wrong (Epic Toon FX support).
 // -----------------------------------------------------------------------------
 
@@ -37,6 +42,8 @@ namespace MathEdu.Gameplay
         protected virtual  bool    StopOnFirstWrong => false;
         protected virtual  float   QuestionDelay     => 0.7f;
         protected virtual  bool    ShowHint          => true;
+        protected virtual  bool    AllowPause        => true;
+        protected virtual  int     TargetQuestionCount => 10;
 
         // ----- runtime references ------------------------------------------
         protected RectTransform _safeArea;
@@ -49,6 +56,8 @@ namespace MathEdu.Gameplay
         protected RectTransform _answersHolder;
         protected Button _hintButton;
         protected TextMeshProUGUI _hintLabel;
+        protected RectTransform _pauseOverlay;
+        protected bool _paused;
 
         protected List<MathQuestion> _questions;
         protected LevelData _level;
@@ -56,7 +65,10 @@ namespace MathEdu.Gameplay
         protected int _correct;
         protected int _wrong;
         protected int _score;
+        protected int _currentStreak;
+        protected int _maxStreak;
         protected bool _locked;
+        protected bool _finished;
 
         protected float _sessionStartTime;
 
@@ -70,7 +82,8 @@ namespace MathEdu.Gameplay
                 GameManager.Instance.UI.Go(UIManager.SceneMainMenu);
                 return;
             }
-            _questions = new List<MathQuestion>(_level.questions);
+
+            _questions = BuildQuestionList(_level);
             if (ShuffleQuestions) Shuffle(_questions);
 
             // Reset per-session counters and timing.
@@ -81,12 +94,62 @@ namespace MathEdu.Gameplay
             ShowQuestion(0);
         }
 
+        /// <summary>
+        /// Build a list of exactly TargetQuestionCount questions, padding by
+        /// duplicating existing ones if the level has fewer. Skips any null
+        /// or invalid entries. If the level has zero usable questions, a
+        /// single fallback "1 + 1 = ?" is injected so the game never crashes.
+        /// </summary>
+        private List<MathQuestion> BuildQuestionList(LevelData level)
+        {
+            var src = new List<MathQuestion>();
+            if (level.questions != null)
+            {
+                foreach (var q in level.questions)
+                {
+                    if (q != null && q.IsValid()) src.Add(q);
+                }
+            }
+            if (src.Count == 0)
+            {
+                Debug.LogError($"[Gameplay] LevelData '{level.levelId}' has no usable questions; using fallback.");
+                src.Add(new MathQuestion
+                {
+                    prompt = "1 + 1 = ?",
+                    options = new[] { "1", "2", "3", "4" },
+                    correctIndex = 1,
+                    hint = "Count up by one.",
+                    explanation = "1 + 1 = 2.",
+                    difficulty = QuestionDifficulty.VeryEasy
+                });
+            }
+            // Pad with duplicates if level has fewer than the target count.
+            if (src.Count < TargetQuestionCount)
+            {
+                Debug.LogWarning($"[Gameplay] Level '{level.levelId}' has only {src.Count} questions; padding to {TargetQuestionCount}.");
+                int i = 0;
+                while (src.Count < TargetQuestionCount)
+                {
+                    src.Add(src[i % src.Count]);
+                    i++;
+                }
+            }
+            else if (src.Count > TargetQuestionCount)
+            {
+                src = src.GetRange(0, TargetQuestionCount);
+            }
+            return src;
+        }
+
         protected virtual void Update()
         {
             // Track real elapsed time on the GameSession so per-subject time
-            // stats are accurate even if frames stutter.
-            GameManager.Instance.Session.elapsedSeconds =
-                Time.unscaledTime - _sessionStartTime;
+            // stats are accurate even if frames stutter. Pauses freeze the clock.
+            if (!_paused)
+            {
+                GameManager.Instance.Session.elapsedSeconds =
+                    Time.unscaledTime - _sessionStartTime;
+            }
         }
 
         protected virtual void BuildUI()
@@ -105,13 +168,26 @@ namespace MathEdu.Gameplay
                 40, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
+            // Back button (with "Quit this level?" confirmation).
             var back = UIFactory.CreateIconButton(header, "<",
                 new Color(0, 0, 0, 0.3f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
             brt.sizeDelta = new Vector2(110, 110);
-            back.onClick.AddListener(() => GameManager.Instance.UI.Go(UIManager.SceneModeSelect));
+            back.onClick.AddListener(ConfirmQuit);
+
+            // Pause button (top-right).
+            if (AllowPause)
+            {
+                var pause = UIFactory.CreateIconButton(header, "II",
+                    new Color(0, 0, 0, 0.3f), "Pause");
+                var prt = (RectTransform)pause.transform;
+                prt.anchorMin = prt.anchorMax = new Vector2(1, 0.5f);
+                prt.anchoredPosition = new Vector2(-80, 0);
+                prt.sizeDelta = new Vector2(110, 110);
+                pause.onClick.AddListener(ShowPauseOverlay);
+            }
 
             BuildHeaderExtras(header);
 
@@ -238,7 +314,7 @@ namespace MathEdu.Gameplay
 
             bool correct = q.IsCorrect(chosenIndex);
             var buttons = _answersHolder.GetComponentsInChildren<AnswerButton>();
-            if (chosenIndex < buttons.Length)
+            if (chosenIndex >= 0 && chosenIndex < buttons.Length)
             {
                 if (correct) buttons[chosenIndex].FlashCorrect();
                 else         buttons[chosenIndex].FlashWrong();
@@ -249,20 +325,29 @@ namespace MathEdu.Gameplay
             if (correct)
             {
                 _correct++;
+                _currentStreak++;
+                if (_currentStreak > _maxStreak) _maxStreak = _currentStreak;
                 _score += ScoreForCorrect(q);
-                GameManager.Instance.Audio.PlayCorrect();
+                GameManager.Instance.Audio.PlaySFX("correct");
                 GameManager.Instance.VFX?.PlayCorrect();
+                HapticManager.Light();
                 _feedback.ShowCorrect(EncouragementCorrect());
                 OnCorrect(q);
             }
             else
             {
                 _wrong++;
-                GameManager.Instance.Audio.PlayWrong();
+                _currentStreak = 0;
+                GameManager.Instance.Audio.PlaySFX("wrong");
                 GameManager.Instance.VFX?.PlayWrong();
                 _feedback.ShowWrong(EncouragementWrong(q));
                 OnWrong(q);
-                if (StopOnFirstWrong) { StartCoroutine(FinishDelayed()); return; }
+                if (StopOnFirstWrong)
+                {
+                    GameManager.Instance.Session.failedEarly = true;
+                    StartCoroutine(FinishDelayed());
+                    return;
+                }
             }
 
             StartCoroutine(AdvanceAfterDelay());
@@ -290,11 +375,28 @@ namespace MathEdu.Gameplay
 
         protected virtual void Finish()
         {
+            if (_finished) return;
+            _finished = true;
+
+            // Cache live counters on the session so the Results scene can
+            // still render them if it reloads.
             int total = _correct + _wrong;
-            int stars = GameManager.Instance.Progress.CompleteLevel(_level, _correct, total, _score);
-            GameManager.Instance.Session.correctCount = _correct;
-            GameManager.Instance.Session.wrongCount   = _wrong;
-            GameManager.Instance.Session.score        = _score;
+            var session = GameManager.Instance.Session;
+            session.correctCount = _correct;
+            session.wrongCount   = _wrong;
+            session.score        = _score;
+            session.maxStreak    = _maxStreak;
+
+            // Record the level and produce a full SessionResult snapshot.
+            var result = GameManager.Instance.Progress.CompleteLevel(
+                _level, _correct, total, _score,
+                session.selectedMode, _maxStreak, session.failedEarly);
+
+            session.lastResult = result;
+
+            // Reset Time.timeScale in case we exit while paused.
+            Time.timeScale = 1f;
+            GameManager.Instance.Audio.PlaySFX("levelComplete");
             GameManager.Instance.UI.Go(UIManager.SceneResults);
         }
 
@@ -302,7 +404,117 @@ namespace MathEdu.Gameplay
         {
             if (_hintLabel == null || _currentIndex >= _questions.Count) return;
             _hintLabel.text = _questions[_currentIndex].hint;
-            GameManager.Instance.Audio.PlayTap();
+            GameManager.Instance.Audio.PlaySFX("tap");
+        }
+
+        // -------------------------------------------------------------------
+        // Pause + quit confirmation
+        // -------------------------------------------------------------------
+        protected virtual void ShowPauseOverlay()
+        {
+            if (_paused) return;
+            _paused = true;
+            Time.timeScale = 0f;
+            GameManager.Instance.Audio.PlaySFX("tap");
+
+            _pauseOverlay = UIFactory.CreatePanel(_safeArea,
+                Vector2.zero, Vector2.one,
+                new Color(0, 0, 0, 0.75f), 0, "PauseOverlay");
+
+            var card = UIFactory.CreatePanel(_pauseOverlay,
+                new Vector2(0.15f, 0.30f), new Vector2(0.85f, 0.70f),
+                UIFactory.Card, 28, "PauseCard");
+
+            var col = UIFactory.CreateVerticalLayout(card, 20,
+                new RectOffset(40, 40, 40, 40), "Col");
+            var crt = (RectTransform)col.transform;
+            crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
+            crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
+
+            UIFactory.CreateText((RectTransform)col.transform, "Paused", 80,
+                UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
+                .fontStyle = FontStyles.Bold;
+
+            var resume = UIFactory.CreateButton((RectTransform)col.transform,
+                "Resume", UIFactory.Success, 42, "Resume");
+            resume.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
+            resume.onClick.AddListener(HidePauseOverlay);
+
+            var restart = UIFactory.CreateButton((RectTransform)col.transform,
+                "Restart", UIFactory.Primary, 42, "Restart");
+            restart.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
+            restart.onClick.AddListener(() =>
+            {
+                Time.timeScale = 1f;
+                GameManager.Instance.UI.Go(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+            });
+
+            var quit = UIFactory.CreateButton((RectTransform)col.transform,
+                "Quit Level", UIFactory.Danger, 42, "Quit");
+            quit.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
+            quit.onClick.AddListener(() =>
+            {
+                Time.timeScale = 1f;
+                GameManager.Instance.UI.Go(UIManager.SceneModeSelect);
+            });
+        }
+
+        protected void HidePauseOverlay()
+        {
+            if (!_paused) return;
+            _paused = false;
+            Time.timeScale = 1f;
+            if (_pauseOverlay != null) Destroy(_pauseOverlay.gameObject);
+            _pauseOverlay = null;
+            GameManager.Instance.Audio.PlaySFX("tap");
+        }
+
+        /// <summary>Show a small "Quit this level?" modal before navigating away.</summary>
+        protected void ConfirmQuit()
+        {
+            if (_paused) return;
+            _paused = true;
+            Time.timeScale = 0f;
+
+            var overlay = UIFactory.CreatePanel(_safeArea,
+                Vector2.zero, Vector2.one,
+                new Color(0, 0, 0, 0.75f), 0, "QuitOverlay");
+            _pauseOverlay = overlay;
+
+            var card = UIFactory.CreatePanel(overlay,
+                new Vector2(0.10f, 0.35f), new Vector2(0.90f, 0.65f),
+                UIFactory.Card, 28, "QuitCard");
+            var col = UIFactory.CreateVerticalLayout(card, 18,
+                new RectOffset(32, 32, 32, 32), "Col");
+            var crt = (RectTransform)col.transform;
+            crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
+            crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
+
+            UIFactory.CreateText((RectTransform)col.transform, "Quit this level?",
+                56, UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
+                .fontStyle = FontStyles.Bold;
+            UIFactory.CreateText((RectTransform)col.transform,
+                "Your progress on this level will be lost.", 32,
+                UIFactory.TextDark, TextAlignmentOptions.Center, "Body");
+
+            var row = new GameObject("BtnRow",
+                typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            row.transform.SetParent(col.transform, false);
+            row.GetComponent<HorizontalLayoutGroup>().spacing = 24;
+            row.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
+            row.GetComponent<LayoutElement>().preferredHeight = 140;
+
+            var stay = UIFactory.CreateButton((RectTransform)row.transform,
+                "Keep playing", UIFactory.Success, 36, "Stay");
+            stay.onClick.AddListener(HidePauseOverlay);
+
+            var quit = UIFactory.CreateButton((RectTransform)row.transform,
+                "Quit", UIFactory.Danger, 36, "Quit");
+            quit.onClick.AddListener(() =>
+            {
+                Time.timeScale = 1f;
+                GameManager.Instance.UI.Go(UIManager.SceneModeSelect);
+            });
         }
 
         protected static void Shuffle<T>(IList<T> list)

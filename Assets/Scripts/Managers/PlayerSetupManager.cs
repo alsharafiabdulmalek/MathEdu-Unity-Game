@@ -9,8 +9,12 @@
 // On "Start Playing" the values are written to PlayerProfile, the
 // `setupComplete` flag is set, and we transition to the Main Menu.
 //
-// Accessing the setup later (e.g. from the Settings screen) just re-uses the
-// same scene — the profile is preserved.
+// First-run safety: if the player never taps an avatar tile, we still default
+// to the first avatar in the library so the Main Menu mini-avatar lookup
+// always succeeds.
+//
+// If the AvatarLibrary is missing or empty for any reason, we build a
+// procedural 8-tile colour wheel inline so the grid is never blank.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -113,21 +117,7 @@ namespace MathEdu.Managers
             grid.constraintCount = 3;
             grid.padding = new RectOffset(12, 12, 12, 12);
 
-            var library = GameManager.Instance.Avatars;
-            if (library != null)
-            {
-                foreach (var avatar in library.avatars)
-                {
-                    if (avatar == null) continue;
-                    var tile = AvatarTile.Spawn(content, avatar);
-                    tile.onSelected += OnAvatarPicked;
-                    if (avatar.avatarId == _selectedAvatarId)
-                    {
-                        _selectedTile = tile;
-                        tile.SetSelected(true);
-                    }
-                }
-            }
+            BuildAvatarGrid(content);
 
             // ----- Grade selector -----
             var gradeBar = UIFactory.CreatePanel(safe,
@@ -177,15 +167,50 @@ namespace MathEdu.Managers
             frt.offsetMin = Vector2.zero; frt.offsetMax = Vector2.zero;
         }
 
+        private void BuildAvatarGrid(RectTransform content)
+        {
+            var library = GameManager.Instance.Avatars;
+            if (library == null || library.avatars == null || library.avatars.Count == 0)
+            {
+                Debug.LogWarning("[PlayerSetup] AvatarLibrary missing — using runtime defaults.");
+                library = AvatarLibrary.BuildDefault();
+                GameManager.Instance.avatarLibrary = library;
+            }
+
+            AvatarTile firstTile = null;
+            foreach (var avatar in library.avatars)
+            {
+                if (avatar == null) continue;
+                var tile = AvatarTile.Spawn(content, avatar);
+                tile.onSelected += OnAvatarPicked;
+                if (firstTile == null) firstTile = tile;
+                if (avatar.avatarId == _selectedAvatarId)
+                {
+                    _selectedTile = tile;
+                    tile.SetSelected(true);
+                }
+            }
+
+            // If the player profile's avatarId doesn't match any library entry
+            // (very common on a fresh profile where avatarId == "default"),
+            // pre-select the first tile so the user is never sent to MainMenu
+            // with an unresolved avatar reference.
+            if (_selectedTile == null && firstTile != null)
+            {
+                _selectedTile = firstTile;
+                _selectedAvatarId = firstTile.Avatar.avatarId;
+                firstTile.SetSelected(true);
+            }
+        }
+
         // -------------------------------------------------------------------
         // Event handlers
         // -------------------------------------------------------------------
         private void OnAvatarPicked(AvatarData avatar)
         {
-            GameManager.Instance.Audio.PlayTap();
+            GameManager.Instance.Audio.PlaySFX("tap");
             if (_selectedTile != null) _selectedTile.SetSelected(false);
 
-            // Find new tile by avatar id (we stored the AvatarData on the tile).
             foreach (var t in FindObjectsByType<AvatarTile>(FindObjectsSortMode.None))
             {
                 if (t.Avatar == avatar)
@@ -200,7 +225,7 @@ namespace MathEdu.Managers
 
         private void OnGradePicked(int grade)
         {
-            GameManager.Instance.Audio.PlayTap();
+            GameManager.Instance.Audio.PlaySFX("tap");
             _selectedGrade = grade;
             for (int i = 0; i < _gradeButtons.Count; i++)
             {
@@ -213,11 +238,21 @@ namespace MathEdu.Managers
 
         private void OnStartPlaying()
         {
-            GameManager.Instance.Audio.PlayWin();
+            GameManager.Instance.Audio.PlaySFX("levelComplete");
 
             // Trim + sanity-check the name. Empty → "Player".
             string nm = (_nameInput != null ? _nameInput.text : "")?.Trim();
             if (string.IsNullOrEmpty(nm)) nm = "Player";
+
+            // If somehow no avatar was selected, default to the first one in
+            // the library so the Main Menu never shows an empty avatar.
+            if (string.IsNullOrEmpty(_selectedAvatarId)
+                || GameManager.Instance.Avatars.FindById(_selectedAvatarId) == null)
+            {
+                var lib = GameManager.Instance.Avatars;
+                if (lib != null && lib.avatars.Count > 0 && lib.avatars[0] != null)
+                    _selectedAvatarId = lib.avatars[0].avatarId;
+            }
 
             _profile.playerName    = nm;
             _profile.avatarId      = _selectedAvatarId;

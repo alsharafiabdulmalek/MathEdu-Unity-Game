@@ -26,9 +26,9 @@ namespace MathEdu.Modes
         {
             _timer = Timer.Spawn(header);
             var rt = (RectTransform)_timer.transform;
-            rt.anchorMin = new Vector2(0.7f, 0);
-            rt.anchorMax = new Vector2(1, 1);
-            rt.offsetMin = new Vector2(0, 8); rt.offsetMax = new Vector2(-24, -8);
+            rt.anchorMin = new Vector2(0.55f, 0);
+            rt.anchorMax = new Vector2(0.85f, 1);
+            rt.offsetMin = new Vector2(0, 8); rt.offsetMax = new Vector2(0, -8);
             _timer.OnExpired += OnTimerExpired;
         }
 
@@ -57,13 +57,26 @@ namespace MathEdu.Modes
             return baseScore + bonus;
         }
 
+        /// <summary>
+        /// Timer ran out: forward to HandleAnswer with an invalid index so the
+        /// run is counted as wrong without flashing a specific button.
+        /// </summary>
         private void OnTimerExpired()
         {
-            if (_locked) return;
+            if (_locked || _finished) return;
+            GameManager.Instance.Audio.PlaySFX("timerExpire");
+            // Use base.HandleAnswer logic via a fake "no answer" path: we mark
+            // the run as wrong inline so the "answer was X" feedback still
+            // reveals the correct option.
             _locked = true;
             _wrong++;
-            GameManager.Instance.Audio.PlayWrong();
+            _currentStreak = 0;
+            var q = _questions[_currentIndex];
+            var buttons = _answersHolder.GetComponentsInChildren<AnswerButton>();
+            if (q.correctIndex >= 0 && q.correctIndex < buttons.Length)
+                buttons[q.correctIndex].FlashCorrect();
             _feedback.ShowWrong("Time's up!");
+            GameManager.Instance.VFX?.PlayWrong();
             StartCoroutine(AdvanceAfterDelay());
         }
     }

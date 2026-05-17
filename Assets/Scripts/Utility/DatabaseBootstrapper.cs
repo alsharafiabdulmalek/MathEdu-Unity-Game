@@ -9,6 +9,10 @@
 // Curriculum size:
 //   3 grades × ~9 subjects × 20 levels × 10 questions = ~4,800 questions.
 //   Quiz / Speed Round timers scale from generous (early) to brisk (late).
+//
+// Story text:
+//   StoryIntro / StoryOutro use subject-specific templates with a per-grade
+//   character flavour, so even procedurally generated levels feel themed.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -114,13 +118,13 @@ namespace MathEdu.Utility
         public static string EmojiForSubject(MathSubject s) => s switch
         {
             MathSubject.Counting       => "🔢",
-            MathSubject.Addition       => "+",
-            MathSubject.Subtraction    => "-",
-            MathSubject.Multiplication => "x",
-            MathSubject.Division       => "/",
+            MathSubject.Addition       => "➕",
+            MathSubject.Subtraction    => "➖",
+            MathSubject.Multiplication => "✖",
+            MathSubject.Division       => "➗",
             MathSubject.Shapes         => "▲",
             MathSubject.Patterns       => "◆◇",
-            MathSubject.Fractions      => "1/2",
+            MathSubject.Fractions      => "½",
             MathSubject.Measurement    => "📏",
             MathSubject.Time           => "🕒",
             MathSubject.Money          => "💰",
@@ -135,23 +139,71 @@ namespace MathEdu.Utility
             _ => ""
         };
 
-        private static string StoryIntro(MathSubject s, int grade, int level) => s switch
+        // -------------------------------------------------------------------
+        // Story templates (subject-themed)
+        // -------------------------------------------------------------------
+        public static string StoryIntro(MathSubject s, int grade, int level)
         {
-            MathSubject.Addition       => "Mia is packing apples in two baskets. Help her count them all!",
-            MathSubject.Subtraction    => "A flock of birds flies away from a tree. How many remain?",
-            MathSubject.Multiplication => "Captain Cat needs to share fish across boats. Multiply to find the total.",
-            MathSubject.Division       => "Ruby the Robot must split her batteries into equal groups.",
-            MathSubject.Counting       => "Hop along the number path with Frog! Count carefully.",
-            MathSubject.Shapes         => "The Shape Wizard has lost his shapes. Identify each one!",
-            MathSubject.Patterns       => "Decorate the parade with the right repeating pattern.",
-            MathSubject.Fractions      => "Pizza party! Cut pizzas into the right number of pieces.",
-            MathSubject.Time           => "The school bell rings. Read the clock to know which class is next!",
-            MathSubject.Money          => "Help Sam at the corner store. Count the coins!",
-            MathSubject.Measurement    => "The carpenter needs the right unit. Pick wisely!",
-            _ => $"A new math adventure begins at Level {level}!"
-        };
+            int a = 1 + (level * 2);
+            int b = 1 + (level + grade);
+            switch (s)
+            {
+                case MathSubject.Addition:
+                    return $"🍎 Farmer Jenny has {a} apples. She picks {b} more. Help her count!";
+                case MathSubject.Subtraction:
+                    return $"🐦 {a + b} birds sat on a wire. {b} flew away. How many are left?";
+                case MathSubject.Multiplication:
+                    return $"🚗 There are {b} parking rows with {a} cars each. How many total?";
+                case MathSubject.Division:
+                    return $"🍕 You have {a * b} pizza slices to share equally with {b} friends.";
+                case MathSubject.Counting:
+                    return "🌟 The night sky is magical! Can you count all the stars?";
+                case MathSubject.Shapes:
+                    return "🏗️ Architect Aria is designing buildings. She needs your help!";
+                case MathSubject.Patterns:
+                    return "🎨 Artist Max is creating a pattern. Can you figure out what comes next?";
+                case MathSubject.Fractions:
+                    return "🎂 It's birthday time! Help slice the cake into equal pieces.";
+                case MathSubject.Measurement:
+                    return "📏 Builder Bob needs exact measurements. Can you help him?";
+                case MathSubject.Time:
+                    return "⏰ The train schedule needs your help! Read the clocks correctly.";
+                case MathSubject.Money:
+                    return "🏪 Welcome to Math Mart! Help the cashier make correct change.";
+                default:
+                    return $"A new math adventure begins at Level {level}!";
+            }
+        }
 
-        private static string StoryOutro(MathSubject s) =>
-            "Great job! The story continues in the next level…";
+        public static string StoryOutro(MathSubject s)
+        {
+            switch (s)
+            {
+                case MathSubject.Addition:
+                    return "Amazing! Jenny is so happy with your help counting her apples! 🎉";
+                case MathSubject.Subtraction:
+                    return "Wonderful! The birds are settled and you helped count them. 🐦";
+                case MathSubject.Multiplication:
+                    return "Brilliant! The parking lot is organized thanks to you. 🚗";
+                case MathSubject.Division:
+                    return "Yum! Everyone got an equal slice of pizza. 🍕";
+                case MathSubject.Counting:
+                    return "Look at all those stars you counted! ⭐";
+                case MathSubject.Shapes:
+                    return "Architect Aria thinks you're a natural builder. 🏗️";
+                case MathSubject.Patterns:
+                    return "Artist Max is impressed with your pattern eye. 🎨";
+                case MathSubject.Fractions:
+                    return "Everyone enjoyed their fair slice of cake. 🎂";
+                case MathSubject.Measurement:
+                    return "Builder Bob's project is perfect — great measuring! 📏";
+                case MathSubject.Time:
+                    return "Every train left on time, thanks to you. ⏰";
+                case MathSubject.Money:
+                    return "Every customer at Math Mart got the right change. 🏪";
+                default:
+                    return "Great job! The story continues…";
+            }
+        }
     }
 }

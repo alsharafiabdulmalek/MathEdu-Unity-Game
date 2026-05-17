@@ -6,13 +6,14 @@
 // VFX). Auto-creates itself the first time anyone calls GameManager.Instance
 // so scenes can be played standalone in the editor.
 //
-// New responsibilities since the initial release:
-//   • Loads (and exposes) the optional AvatarLibrary for the Player Setup
-//     screen — falls back to a runtime-built default library.
-//   • Owns a VFXManager so any scene can fire Epic Toon FX prefabs through
-//     `GameManager.Instance.VFX.PlayCorrect()`.
-//   • Tracks per-subject statistics through ProgressManager so the Parental
-//     Dashboard always has fresh numbers.
+// Standalone-scene safety:
+//   • If a scene is opened directly without going through Bootstrap, the
+//     first call to GameManager.Instance lazily creates the singleton,
+//     loads the saved profile (or builds a default), and registers
+//     fallback Subject/Grade/Level selections so the gameplay managers
+//     never crash on null lookups.
+//   • Every helper property (CurrentLevel/Subject/Grade) returns null only
+//     when the database itself is missing; callers always handle null.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -37,7 +38,7 @@ namespace MathEdu.Managers
                     {
                         var go = new GameObject("[GameManager]");
                         _instance = go.AddComponent<GameManager>();
-                        DontDestroyOnLoad(go);
+                        // Awake handles DontDestroyOnLoad + child managers.
                     }
                 }
                 return _instance;
@@ -58,6 +59,8 @@ namespace MathEdu.Managers
         public UIManager       UI       { get; private set; }
         public VFXManager      VFX      { get; private set; }
 
+        private bool _initialized;
+
         // ------------------------------------------------------ lifecycle --
         private void Awake()
         {
@@ -68,12 +71,36 @@ namespace MathEdu.Managers
             }
             _instance = this;
             DontDestroyOnLoad(gameObject);
+            Initialize();
+        }
+
+        private void Initialize()
+        {
+            if (_initialized) return;
+            _initialized = true;
 
             EnsureDatabase();
             EnsureAvatarLibrary();
-            Profile  = SaveSystem.Load();
+
+            Profile = SaveSystem.Load() ?? new PlayerProfile();
+
+            // Initialise sensible defaults on a brand-new profile so the
+            // gameplay scenes can run standalone without going through
+            // PlayerSetup → MainMenu first.
+            if (Profile.selectedGrade <= 0) Profile.selectedGrade = 1;
+            if (Session == null) Session = new GameSession();
+            Session.selectedGrade   = Profile.selectedGrade;
+            if (database != null && database.grades.Count > 0)
+            {
+                var g = database.GetGrade(Session.selectedGrade);
+                if (g != null && g.subjects.Count > 0)
+                    Session.selectedSubject = g.subjects[0].subject;
+            }
+            if (Session.selectedLevel < 1) Session.selectedLevel = 1;
+
             UnlockStartingLevels();
 
+            // Composite managers (added once per GameManager instance).
             Audio    = gameObject.AddComponent<AudioManager>();
             Progress = gameObject.AddComponent<ProgressManager>();
             UI       = gameObject.AddComponent<UIManager>();
@@ -85,12 +112,12 @@ namespace MathEdu.Managers
 
         private void OnApplicationPause(bool paused)
         {
-            if (paused) SaveSystem.Save(Profile);
+            if (paused && Profile != null) SaveSystem.Save(Profile);
         }
 
         private void OnApplicationQuit()
         {
-            SaveSystem.Save(Profile);
+            if (Profile != null) SaveSystem.Save(Profile);
         }
 
         // ------------------------------------------------------ helpers ----
@@ -101,7 +128,8 @@ namespace MathEdu.Managers
 
             // Try Resources first so a build-time asset wins.
             var fromResources = Resources.Load<MathDatabase>("MathDatabase");
-            if (fromResources != null && fromResources.grades.Count > 0)
+            if (fromResources != null && fromResources.grades != null
+                && fromResources.grades.Count > 0)
             {
                 database = fromResources;
                 return;
@@ -114,10 +142,13 @@ namespace MathEdu.Managers
 
         private void EnsureAvatarLibrary()
         {
-            if (avatarLibrary != null && avatarLibrary.avatars.Count > 0) return;
+            if (avatarLibrary != null && avatarLibrary.avatars != null
+                && avatarLibrary.avatars.Count > 0)
+                return;
 
             var fromResources = Resources.Load<AvatarLibrary>("AvatarLibrary");
-            if (fromResources != null && fromResources.avatars.Count > 0)
+            if (fromResources != null && fromResources.avatars != null
+                && fromResources.avatars.Count > 0)
             {
                 avatarLibrary = fromResources;
                 return;
@@ -130,17 +161,26 @@ namespace MathEdu.Managers
             if (Profile == null || database == null) return;
             foreach (var grade in database.grades)
             {
+                if (grade == null) continue;
                 foreach (var subject in grade.subjects)
                 {
-                    if (subject.levels.Count > 0 && subject.levels[0] != null)
+                    if (subject == null) continue;
+                    if (subject.levels != null && subject.levels.Count > 0 && subject.levels[0] != null)
+                    {
                         Profile.Unlock(subject.levels[0].levelId);
+                        Profile.RecordSubjectHighestUnlocked(subject.SubjectKey, 1);
+                    }
                 }
             }
             SaveSystem.Save(Profile);
         }
 
         // ------------------------------------------------------ API --------
-        public void SelectGrade(int g)        { Session.selectedGrade = g; Profile.selectedGrade = g; }
+        public void SelectGrade(int g)
+        {
+            Session.selectedGrade = g;
+            if (Profile != null) Profile.selectedGrade = g;
+        }
         public void SelectSubject(MathSubject s) { Session.selectedSubject = s; }
         public void SelectLevel(int l)        { Session.selectedLevel = l; }
         public void SelectMode(LearningMode m){ Session.selectedMode = m; }
@@ -158,6 +198,9 @@ namespace MathEdu.Managers
         public GradeData CurrentGrade =>
             database != null ? database.GetGrade(Session.selectedGrade) : null;
 
-        public void SaveProfile() => SaveSystem.Save(Profile);
+        public void SaveProfile()
+        {
+            if (Profile != null) SaveSystem.Save(Profile);
+        }
     }
 }

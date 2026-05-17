@@ -4,6 +4,8 @@
 // Rapid-fire mode. Each question gets a very short window
 // (level.speedSecondsPerQuestion). One wrong answer ends the run, so the
 // goal is "how many in a row?" rather than total correct.
+//
+// Speed Round explicitly disables the pause button — that's the challenge.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -21,6 +23,12 @@ namespace MathEdu.Modes
         protected override bool   ShowHint         => false;
         protected override bool   StopOnFirstWrong => true;
         protected override float  QuestionDelay    => 0.4f;
+        protected override bool   AllowPause       => false;
+
+        // Speed Round needs more questions than a level provides because
+        // we keep going until the player gets one wrong. We pre-build a
+        // large pool by recycling the level's questions.
+        protected override int TargetQuestionCount => 50;
 
         private Timer _timer;
 
@@ -28,9 +36,9 @@ namespace MathEdu.Modes
         {
             _timer = Timer.Spawn(header);
             var rt = (RectTransform)_timer.transform;
-            rt.anchorMin = new Vector2(0.7f, 0);
-            rt.anchorMax = new Vector2(1, 1);
-            rt.offsetMin = new Vector2(0, 8); rt.offsetMax = new Vector2(-24, -8);
+            rt.anchorMin = new Vector2(0.55f, 0);
+            rt.anchorMax = new Vector2(0.85f, 1);
+            rt.offsetMin = new Vector2(0, 8); rt.offsetMax = new Vector2(0, -8);
             _timer.OnExpired += OnTimerExpired;
         }
 
@@ -40,7 +48,6 @@ namespace MathEdu.Modes
             if (_timer != null && _currentIndex < _questions.Count)
             {
                 _timer.Begin(_level.speedSecondsPerQuestion);
-                GameManager.Instance.Audio.PlayTick();
             }
         }
 
@@ -57,11 +64,14 @@ namespace MathEdu.Modes
 
         private void OnTimerExpired()
         {
-            if (_locked) return;
+            if (_locked || _finished) return;
+            GameManager.Instance.Audio.PlaySFX("timerExpire");
             _locked = true;
             _wrong++;
+            _currentStreak = 0;
+            GameManager.Instance.Session.failedEarly = true;
             _feedback.ShowWrong("Too slow!");
-            GameManager.Instance.Audio.PlayWrong();
+            GameManager.Instance.VFX?.PlayWrong();
             StartCoroutine(FinishDelayed());
         }
     }

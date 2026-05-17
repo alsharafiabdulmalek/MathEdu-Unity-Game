@@ -44,7 +44,11 @@ namespace MathEdu.Modes
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
             brt.sizeDelta = new Vector2(110, 110);
-            back.onClick.AddListener(() => GameManager.Instance.UI.Go(UIManager.SceneLevelSelect));
+            back.onClick.AddListener(() =>
+            {
+                GameManager.Instance.Audio.PlaySFX("tap");
+                GameManager.Instance.UI.Go(UIManager.SceneLevelSelect);
+            });
 
             var listHolder = UIFactory.CreatePanel(safe,
                 new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.86f),
@@ -91,7 +95,7 @@ namespace MathEdu.Modes
 
         private void Begin(LearningMode m)
         {
-            GameManager.Instance.Audio.PlayTap();
+            GameManager.Instance.Audio.PlaySFX("tap");
             GameManager.Instance.SelectMode(m);
             switch (m)
             {

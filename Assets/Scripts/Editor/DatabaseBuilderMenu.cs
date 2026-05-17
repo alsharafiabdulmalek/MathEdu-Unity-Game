@@ -95,8 +95,10 @@ namespace MathEdu.EditorTools
                         ld.lessonIntro   = QuestionGenerator.LessonIntro(gradeNum, subj);
                         ld.lessonExample = QuestionGenerator.LessonExample(gradeNum, subj, lvl);
                         ld.lessonTip     = QuestionGenerator.LessonTip(subj);
-                        ld.storyIntro    = $"A new chapter for Level {lvl}!";
-                        ld.storyOutro    = "Great work! The story continues…";
+                        // Use subject-specific templates from DatabaseBootstrapper
+                        // so each level reads as a themed adventure.
+                        ld.storyIntro    = DatabaseBootstrapper.StoryIntro(subj, gradeNum, lvl);
+                        ld.storyOutro    = DatabaseBootstrapper.StoryOutro(subj);
                         ld.questions     = QuestionGenerator.Generate(gradeNum, subj, lvl);
                         ld.quizSecondsPerQuestion  = DatabaseBootstrapper.TimerForQuiz(lvl);
                         ld.speedSecondsPerQuestion = DatabaseBootstrapper.TimerForSpeed(lvl);
