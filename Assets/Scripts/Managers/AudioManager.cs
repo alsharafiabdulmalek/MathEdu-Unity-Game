@@ -4,6 +4,14 @@
 // Plays SFX and music. Generates pleasant procedural tones at runtime so the
 // project works with zero packaged audio assets. Once real .wav clips are
 // dropped into Assets/Resources/Audio, AudioManager will prefer those.
+//
+// Volume control:
+//   - PlayerProfile.musicVolume / sfxVolume are the master values (0..1).
+//   - PlayerProfile.musicOn / sfxOn are master switches; flipping them off
+//     drives the corresponding AudioSource to 0 without forgetting the slider
+//     value.
+//   - The Settings scene calls SetMusicVolume / SetSfxVolume after every
+//     change.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -24,6 +32,7 @@ namespace MathEdu.Managers
         private AudioClip _winClip;
         private AudioClip _loseClip;
         private AudioClip _tickClip;
+        private AudioClip _musicClip;
 
         public void Init(PlayerProfile profile)
         {
@@ -31,17 +40,20 @@ namespace MathEdu.Managers
 
             _sfxSource              = gameObject.AddComponent<AudioSource>();
             _sfxSource.playOnAwake  = false;
-            _sfxSource.volume       = profile != null ? profile.sfxVolume : 1f;
+            _sfxSource.volume       = EffectiveSfxVolume();
 
             _musicSource             = gameObject.AddComponent<AudioSource>();
             _musicSource.playOnAwake = false;
             _musicSource.loop        = true;
-            _musicSource.volume      = profile != null ? profile.musicVolume : 0.7f;
+            _musicSource.volume      = EffectiveMusicVolume();
 
             BuildProceduralClips();
             TryLoadFromResources();
         }
 
+        // -------------------------------------------------------------------
+        // One-shot SFX
+        // -------------------------------------------------------------------
         public void PlayCorrect() => Play(_correctClip);
         public void PlayWrong()   => Play(_wrongClip);
         public void PlayTap()     => Play(_tapClip);
@@ -49,16 +61,63 @@ namespace MathEdu.Managers
         public void PlayLose()    => Play(_loseClip);
         public void PlayTick()    => Play(_tickClip);
 
+        // -------------------------------------------------------------------
+        // Music
+        // -------------------------------------------------------------------
+        public void PlayMusic(AudioClip clip = null)
+        {
+            if (clip != null) _musicClip = clip;
+            if (_musicClip == null) return;
+            if (_musicSource.clip == _musicClip && _musicSource.isPlaying) return;
+            _musicSource.clip = _musicClip;
+            _musicSource.Play();
+        }
+
+        public void StopMusic()
+        {
+            if (_musicSource != null) _musicSource.Stop();
+        }
+
+        // -------------------------------------------------------------------
+        // Volume API (drives both PlayerProfile values and live sources)
+        // -------------------------------------------------------------------
         public void ApplyVolumeFromProfile()
         {
             if (_profile == null) return;
-            _sfxSource.volume   = _profile.sfxVolume;
-            _musicSource.volume = _profile.musicVolume;
+            _sfxSource.volume   = EffectiveSfxVolume();
+            _musicSource.volume = EffectiveMusicVolume();
         }
 
+        public void SetMusicVolume(float v)
+        {
+            if (_profile != null) _profile.musicVolume = Mathf.Clamp01(v);
+            if (_musicSource != null) _musicSource.volume = EffectiveMusicVolume();
+        }
+
+        public void SetSfxVolume(float v)
+        {
+            if (_profile != null) _profile.sfxVolume = Mathf.Clamp01(v);
+            if (_sfxSource != null) _sfxSource.volume = EffectiveSfxVolume();
+        }
+
+        private float EffectiveMusicVolume()
+        {
+            if (_profile == null) return 0.7f;
+            return _profile.musicOn ? _profile.musicVolume : 0f;
+        }
+
+        private float EffectiveSfxVolume()
+        {
+            if (_profile == null) return 1f;
+            return _profile.sfxOn ? _profile.sfxVolume : 0f;
+        }
+
+        // -------------------------------------------------------------------
+        // Internal
+        // -------------------------------------------------------------------
         private void Play(AudioClip clip)
         {
-            if (clip != null && _sfxSource != null)
+            if (clip != null && _sfxSource != null && EffectiveSfxVolume() > 0)
                 _sfxSource.PlayOneShot(clip);
         }
 
@@ -76,6 +135,8 @@ namespace MathEdu.Managers
             if (lose != null) _loseClip = lose;
             var tick = Resources.Load<AudioClip>("Audio/sfx_tick");
             if (tick != null) _tickClip = tick;
+            var music = Resources.Load<AudioClip>("Audio/music_menu");
+            if (music != null) _musicClip = music;
         }
 
         private void BuildProceduralClips()
