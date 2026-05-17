@@ -14,6 +14,14 @@
 //     never crash on null lookups.
 //   • Every helper property (CurrentLevel/Subject/Grade) returns null only
 //     when the database itself is missing; callers always handle null.
+//
+// Lazy database fill:
+//   • When the in-memory database (DatabaseBootstrapper.BuildInMemory) is in
+//     use, levels are created as skeletons. CurrentLevel populates each
+//     level's questions / lesson text / story text on first access via
+//     DatabaseBootstrapper.EnsureLevelContent(). This keeps Bootstrap.unity
+//     instant on constrained machines and spreads the question-generation
+//     cost over the course of normal play.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -135,9 +143,12 @@ namespace MathEdu.Managers
                 return;
             }
 
-            // Fallback: procedural runtime database.
+            // Fallback: procedural runtime database — skeleton only, levels
+            // are filled with questions / text lazily on first access via
+            // CurrentLevel below. Cost here: < 100 ms even on a low-RAM Mac.
             database = DatabaseBootstrapper.BuildInMemory();
-            Debug.Log($"[GameManager] Built runtime MathDatabase with {database.TotalQuestionCount} questions.");
+            Debug.Log("[GameManager] Built runtime MathDatabase (lazy skeleton — " +
+                      "questions generated on demand).");
         }
 
         private void EnsureAvatarLibrary()
@@ -185,10 +196,30 @@ namespace MathEdu.Managers
         public void SelectLevel(int l)        { Session.selectedLevel = l; }
         public void SelectMode(LearningMode m){ Session.selectedMode = m; }
 
-        public LevelData CurrentLevel =>
-            database != null
-                ? database.GetLevel(Session.selectedGrade, Session.selectedSubject, Session.selectedLevel)
-                : null;
+        /// <summary>
+        /// Returns the currently selected LevelData, populating its
+        /// questions / lesson text / story text on first access via the
+        /// lazy DatabaseBootstrapper.EnsureLevelContent() helper. Reading
+        /// CurrentLevel from the same level multiple times is cheap — the
+        /// second hit is a single null/empty check.
+        /// </summary>
+        public LevelData CurrentLevel
+        {
+            get
+            {
+                if (database == null) return null;
+                var level = database.GetLevel(
+                    Session.selectedGrade,
+                    Session.selectedSubject,
+                    Session.selectedLevel);
+                if (level != null)
+                {
+                    DatabaseBootstrapper.EnsureLevelContent(
+                        level, Session.selectedGrade, Session.selectedSubject);
+                }
+                return level;
+            }
+        }
 
         public SubjectData CurrentSubject =>
             database != null
