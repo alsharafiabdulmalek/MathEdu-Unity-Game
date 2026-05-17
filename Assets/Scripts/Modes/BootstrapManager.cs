@@ -1,7 +1,11 @@
 // -----------------------------------------------------------------------------
 // BootstrapManager.cs
 // -----------------------------------------------------------------------------
-// Tiny scene that ensures all root managers exist, then jumps to MainMenu.
+// Tiny scene that ensures all root managers exist, shows a quick splash, then
+// jumps to either:
+//   • PlayerSetup — on first launch, or whenever the profile has been wiped.
+//   • MainMenu    — otherwise.
+//
 // Place this script on the only GameObject in the Bootstrap scene.
 // -----------------------------------------------------------------------------
 
@@ -14,12 +18,15 @@ namespace MathEdu.Modes
 {
     public class BootstrapManager : MonoBehaviour
     {
+        [Tooltip("Seconds the splash logo stays visible before the next scene loads.")]
+        public float splashSeconds = 1.2f;
+
         private void Start()
         {
             _ = GameManager.Instance;
 
             var (canvas, safe) = UIFactory.CreateCanvas("[BootstrapCanvas]");
-            UIFactory.CreateGradientBackground(safe, UIFactory.BgTop, UIFactory.BgBottom);
+            UIFactory.CreateThemedBackground(safe, "setup");
 
             var logo = UIFactory.CreateText(safe, "MathEdu", 160,
                 Color.white, TMPro.TextAlignmentOptions.Center, "Logo");
@@ -33,12 +40,16 @@ namespace MathEdu.Modes
             var trt = tag.rectTransform;
             trt.anchorMin = new Vector2(0, 0.4f); trt.anchorMax = new Vector2(1, 0.5f);
 
-            Invoke(nameof(GoToMainMenu), 1.2f);
+            Invoke(nameof(GoToNextScene), splashSeconds);
         }
 
-        private void GoToMainMenu()
+        private void GoToNextScene()
         {
-            GameManager.Instance.UI.Go(UIManager.SceneMainMenu, 0.4f);
+            var profile = GameManager.Instance.Profile;
+            string scene = (profile != null && profile.setupComplete)
+                ? UIManager.SceneMainMenu
+                : UIManager.ScenePlayerSetup;
+            GameManager.Instance.UI.Go(scene, 0.4f);
         }
     }
 }
