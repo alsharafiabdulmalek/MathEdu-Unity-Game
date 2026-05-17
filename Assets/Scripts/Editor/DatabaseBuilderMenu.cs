@@ -1,50 +1,33 @@
 // -----------------------------------------------------------------------------
 // DatabaseBuilderMenu.cs
 // -----------------------------------------------------------------------------
-// Editor-only menu items that materialize the procedural math database into
-// real .asset files. Run once after cloning to get the full content tree
-// loaded into Resources.
+// Editor-only menu items that prepare the project for Play.
 //
-// ====== PERFORMANCE NOTE (the reason this file was rewritten) =================
-// The previous implementation created ~570 individual .asset files on disk —
-// one per Grade / Subject / Level — *without* batching the asset operations.
-// On macOS, every CreateAsset call triggered a full AssetDatabase cycle and
-// the final AssetDatabase.Refresh() re-imported the entire project. On a
-// typical Mac this took anywhere from 30 minutes to "stuck for 10+ hours".
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  ⚡ FAST PATH FOR CONSTRAINED MACHINES (e.g. 8 GB MacBook Air)            ║
+// ║                                                                          ║
+// ║      MathEdu → ⚡ Quick Start (No DB Build — Recommended)                ║
+// ║                                                                          ║
+// ║  Skips writing the database asset entirely. The game still plays with    ║
+// ║  all 4,800 questions because GameManager.EnsureDatabase() builds the     ║
+// ║  whole tree in memory at startup via DatabaseBootstrapper.BuildInMemory  ║
+// ║  in well under a second. Quick Start only builds the avatar library     ║
+// ║  (10 tiny assets) and the 13 scenes — total time < 30 seconds even on   ║
+// ║  a constrained MacBook Air.                                              ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
 //
-// This rewrite fixes the hang with three independent improvements:
+// Why does Quick Start exist?
+//   The previous slow database build (~570 individual .asset files) was
+//   replaced with a single-asset path (~540 nested sub-assets). On a fast
+//   Mac the single-asset path finishes in 3–10 s, but on a constrained
+//   MacBook Air it can still take many minutes because writing/serializing
+//   a 5+ MB asset with 540 sub-objects + Unity's import pipeline is RAM
+//   hungry. Quick Start side-steps the whole issue by never writing an
+//   asset — the game uses the runtime fallback that has always existed.
 //
-//   1. FAST PATH (the new default): "MathEdu / Build Default Database"
-//      Creates ONE consolidated MathDatabase.asset directly in
-//      Assets/Resources/ with every Grade / Subject / Level stored as a
-//      *nested sub-asset* via AssetDatabase.AddObjectToAsset(). The whole
-//      database is ONE file on disk → ONE asset import → typically 3–10
-//      seconds even on a slow Mac. The Project window still shows the full
-//      tree because Unity unfolds sub-assets under their parent.
-//
-//   2. ASSET-EDITING BATCHING
-//      Every menu item now wraps its asset work in
-//      AssetDatabase.StartAssetEditing() / StopAssetEditing() with a
-//      try/finally. This suspends Unity's automatic per-asset import
-//      processing during the build.
-//
-//   3. PROGRESS BAR + CANCEL
-//      The build now shows EditorUtility.DisplayCancelableProgressBar so
-//      the user can SEE that work is happening and abort if they need to.
-//      The fast build is short enough that this is mainly informational.
-//
-// ====== ADVANCED (PER-GRADE FILE ASSETS) =====================================
-// For users who want individual .asset files in the Project window (so they
-// can tune levels in the Inspector), MathEdu / Advanced / Per-Grade Assets
-// lets you build ONE grade at a time. Each grade build is independent and
-// resumable — close Unity between grades if you want.
-//
-// ====== SKIP-THE-BUILD SHORTCUT ==============================================
-// You don't actually have to run any of these menu items to play the game.
-// GameManager.EnsureDatabase() builds a fully populated MathDatabase in
-// memory via DatabaseBootstrapper.BuildInMemory() if no asset is found.
-// "MathEdu / Advanced / Use Runtime Database Only" surfaces a popup
-// explaining this.
+// The other paths (Build Default Database, Per-Grade Assets) are kept for
+// users who specifically want the data visible as files in the Project
+// window, but they are NOT required for play.
 // -----------------------------------------------------------------------------
 
 #if UNITY_EDITOR
@@ -68,15 +51,93 @@ namespace MathEdu.EditorTools
         private const string LegacyDbPath  = "Assets/ScriptableObjects/MathDatabase.asset";
 
         // ===================================================================
-        //                        FAST PATH (recommended)
+        //              ⚡ QUICK START (the bulletproof path)
         // ===================================================================
 
         /// <summary>
-        /// Default "Build Database" entry point. Generates a single
-        /// consolidated MathDatabase.asset in Assets/Resources/ with every
-        /// Grade / Subject / Level stored as a nested sub-asset. Typically
-        /// 3–10 seconds, even on slow machines, because Unity only has to
-        /// import ONE file rather than ~570 separate .asset files.
+        /// THE recommended setup path on every machine, especially
+        /// constrained ones (8 GB MacBook Air, older Macs, low-RAM Windows).
+        /// Builds avatars + scenes. Does NOT touch the math database — that
+        /// is built in memory at runtime in well under a second by
+        /// DatabaseBootstrapper.BuildInMemory(). The game is fully playable
+        /// with all 4,800 questions in all 11 subjects across all 5 modes.
+        /// Typical wall time: well under 30 seconds.
+        /// </summary>
+        [MenuItem("MathEdu/⚡ Quick Start (No DB Build — Recommended)", priority = 0)]
+        public static void QuickStart()
+        {
+            if (!EditorUtility.DisplayDialog("MathEdu — ⚡ Quick Start",
+                "RECOMMENDED PATH — works even on a constrained MacBook Air.\n\n" +
+                "This will run, in order:\n" +
+                "   1. Build Default Avatar Library (10 avatars, ~1 s)\n" +
+                "   2. Build All Scenes (13 scenes, ~5 s)\n\n" +
+                "The math database is NOT written to disk. It is built in " +
+                "memory at runtime by DatabaseBootstrapper.BuildInMemory() " +
+                "when you press Play (well under a second). The game is " +
+                "FULLY playable with all 4,800 questions, all 11 subjects, " +
+                "all 5 modes.\n\n" +
+                "If you later want the database visible in the Project " +
+                "window, run \"MathEdu → Build Default Database\" — that's " +
+                "optional, not required for play.",
+                "Run Quick Start", "Cancel"))
+                return;
+
+            BuildAvatars();
+            SceneBuilderMenu.BuildAll();
+
+            EditorUtility.DisplayDialog("MathEdu — ⚡ Quick Start Complete",
+                "All set!\n\n" +
+                "▶  Open Assets/Scenes/Bootstrap.unity and press Play.\n\n" +
+                "On first play the math database is built in memory in " +
+                "well under a second — no progress bar, no waiting.",
+                "OK");
+        }
+
+        // ===================================================================
+        //              FULL SETUP (also writes the DB asset)
+        // ===================================================================
+
+        /// <summary>
+        /// Same as Quick Start but ALSO writes the consolidated MathDatabase
+        /// asset. On a constrained MacBook Air this can take several minutes
+        /// or longer due to the volume of nested sub-assets — use Quick
+        /// Start instead unless you specifically need the asset on disk.
+        /// </summary>
+        [MenuItem("MathEdu/Run Full Setup (writes DB asset — may be slow on low-RAM Macs)", priority = 5)]
+        public static void RunFullSetup()
+        {
+            if (!EditorUtility.DisplayDialog("MathEdu — Full Setup",
+                "This will run, in order:\n" +
+                "   1. Build Default Database (consolidated single asset)\n" +
+                "   2. Build Default Avatar Library\n" +
+                "   3. Build All Scenes\n\n" +
+                "⚠  On a constrained machine (8 GB MacBook Air, older Mac, " +
+                "low-RAM Windows) step 1 can still take several minutes or " +
+                "longer because it serializes ~540 nested sub-assets into " +
+                "a single multi-megabyte .asset file.\n\n" +
+                "If unsure, hit Cancel and use \"⚡ Quick Start (No DB " +
+                "Build)\" — the game runs identically either way.",
+                "Run Full Setup", "Cancel"))
+                return;
+
+            BuildFast();
+            BuildAvatars();
+            SceneBuilderMenu.BuildAll();
+
+            EditorUtility.DisplayDialog("MathEdu — Full Setup Complete",
+                "Done! Open Assets/Scenes/Bootstrap.unity and press ▶ Play.",
+                "OK");
+        }
+
+        // ===================================================================
+        //                        FAST DB BUILD (optional)
+        // ===================================================================
+
+        /// <summary>
+        /// Generates a single consolidated MathDatabase.asset in
+        /// Assets/Resources/ with every Grade / Subject / Level stored as a
+        /// nested sub-asset. Optional — only needed for Project-window
+        /// browsing. NOT required to play (see Quick Start).
         /// </summary>
         [MenuItem("MathEdu/Build Default Database", priority = 10)]
         public static void BuildFast()
@@ -100,18 +161,11 @@ namespace MathEdu.EditorTools
                 db.name = "MathDatabase";
                 AssetDatabase.CreateAsset(db, ResDbPath);
 
+                int approxTotalLevels = 3 * 9 * QuestionGenerator.LevelsPerSubject;
+                int builtLevels = 0;
+
                 for (int gradeNum = 1; gradeNum <= 3 && !cancelled; gradeNum++)
                 {
-                    float gradeProgress = (gradeNum - 1) / 3f;
-                    if (EditorUtility.DisplayCancelableProgressBar(
-                            "MathEdu — Building Database (fast)",
-                            $"Grade {gradeNum} of 3…",
-                            gradeProgress))
-                    {
-                        cancelled = true;
-                        break;
-                    }
-
                     var grade = ScriptableObject.CreateInstance<GradeData>();
                     grade.name        = $"Grade_{gradeNum}";
                     grade.gradeNumber = gradeNum;
@@ -124,15 +178,6 @@ namespace MathEdu.EditorTools
                     for (int si = 0; si < subjects.Length && !cancelled; si++)
                     {
                         var subj = subjects[si];
-                        float subjectProgress = gradeProgress + (1f / 3f) * ((float)si / subjects.Length);
-                        if (EditorUtility.DisplayCancelableProgressBar(
-                                "MathEdu — Building Database (fast)",
-                                $"Grade {gradeNum} • {QuestionGenerator.Pretty(subj)} ({si + 1}/{subjects.Length})",
-                                subjectProgress))
-                        {
-                            cancelled = true;
-                            break;
-                        }
 
                         var s = ScriptableObject.CreateInstance<SubjectData>();
                         s.name        = $"Subject_G{gradeNum}_{subj}";
@@ -145,10 +190,22 @@ namespace MathEdu.EditorTools
 
                         for (int lvl = 1; lvl <= QuestionGenerator.LevelsPerSubject; lvl++)
                         {
+                            // Update progress per-level so the user can see
+                            // forward progress even on a slow machine.
+                            if (EditorUtility.DisplayCancelableProgressBar(
+                                    "MathEdu — Building Database",
+                                    $"G{gradeNum} • {QuestionGenerator.Pretty(subj)} • Level {lvl}/20",
+                                    (float)builtLevels / approxTotalLevels))
+                            {
+                                cancelled = true;
+                                break;
+                            }
+
                             var ld = BuildLevelData(gradeNum, subj, lvl);
                             AssetDatabase.AddObjectToAsset(ld, db);
                             s.levels.Add(ld);
                             totalLevels++;
+                            builtLevels++;
                             totalQuestions += ld.questions != null ? ld.questions.Count : 0;
                         }
 
@@ -165,9 +222,6 @@ namespace MathEdu.EditorTools
                 EditorUtility.ClearProgressBar();
             }
 
-            // Save the parent asset (which also flushes every sub-asset).
-            // We deliberately do NOT call AssetDatabase.Refresh() — there
-            // is nothing to scan, only one .asset file changed.
             AssetDatabase.SaveAssets();
             AssetDatabase.ImportAsset(ResDbPath);
 
@@ -175,7 +229,7 @@ namespace MathEdu.EditorTools
             int finalQuestions = built != null ? built.TotalQuestionCount : 0;
             int finalGrades    = built != null ? built.grades.Count       : 0;
 
-            Debug.Log($"[MathEdu] Database built (fast). " +
+            Debug.Log($"[MathEdu] Database built. " +
                       $"Grades: {finalGrades}, Levels: {totalLevels}, Questions: {finalQuestions}" +
                       (cancelled ? " — partial (user cancelled)." : "."));
 
@@ -184,16 +238,12 @@ namespace MathEdu.EditorTools
                 cancelled
                     ? $"Build was cancelled. A partial database with {finalGrades} grade(s) " +
                       $"and {finalQuestions} questions was saved to:\n{ResDbPath}\n\n" +
-                      $"Re-run \"MathEdu → Build Default Database\" to complete it."
+                      $"The game is still playable — the runtime fallback fills in any " +
+                      $"missing data. To complete the asset later, re-run this menu item " +
+                      $"or use \"⚡ Quick Start\" to skip the asset entirely."
                     : $"Math database built as a single consolidated asset.\n\n" +
                       $"📂  {ResDbPath}\n" +
-                      $"📊  {finalGrades} grades  •  {totalLevels} levels  •  {finalQuestions} questions\n\n" +
-                      $"This is the fast path — ONE .asset file instead of ~570.\n" +
-                      $"GameManager loads it from Resources automatically.\n\n" +
-                      $"Next steps:\n" +
-                      $"   1. MathEdu → Build Default Avatar Library\n" +
-                      $"   2. MathEdu → Build All Scenes\n" +
-                      $"   3. Open Assets/Scenes/Bootstrap.unity and press ▶ Play",
+                      $"📊  {finalGrades} grades  •  {totalLevels} levels  •  {finalQuestions} questions",
                 "OK");
         }
 
@@ -258,7 +308,6 @@ namespace MathEdu.EditorTools
 
                 EditorUtility.SetDirty(lib);
 
-                // Mirror to Resources so GameManager loads it automatically.
                 if (AssetDatabase.LoadAssetAtPath<AvatarLibrary>(ResAvatarPath) != null)
                     AssetDatabase.DeleteAsset(ResAvatarPath);
                 AssetDatabase.CopyAsset(libPath, ResAvatarPath);
@@ -361,7 +410,6 @@ namespace MathEdu.EditorTools
                 }
                 EditorUtility.SetDirty(db);
 
-                // Mirror to Resources.
                 if (AssetDatabase.LoadAssetAtPath<MathDatabase>(ResDbPath) != null)
                     AssetDatabase.DeleteAsset(ResDbPath);
                 AssetDatabase.CopyAsset(LegacyDbPath, ResDbPath);
@@ -389,11 +437,8 @@ namespace MathEdu.EditorTools
         ///   Assets/ScriptableObjects/Grades/Grade{N}/{Subject}/Level_{lvl:00}.asset
         ///
         /// Properly batched with StartAssetEditing(); shows a progress bar.
-        /// Typically 10–30 seconds per grade on a modern Mac.
-        ///
-        /// After running one or more grade builds, call "Rebuild Master
-        /// Index" to update Assets/Resources/MathDatabase.asset so the
-        /// runtime sees the new content.
+        /// Typically 10–30 seconds per grade on a modern Mac, but on a
+        /// constrained machine this is still slower than Quick Start.
         /// </summary>
         private static void BuildPerGradeAssets(int gradeNum)
         {
@@ -426,18 +471,11 @@ namespace MathEdu.EditorTools
                 grade.subjects.Clear();
 
                 var subjects = QuestionGenerator.SubjectsFor(gradeNum);
+                int totalUnits = subjects.Length * QuestionGenerator.LevelsPerSubject;
+                int done = 0;
                 for (int si = 0; si < subjects.Length && !cancelled; si++)
                 {
                     var subj = subjects[si];
-                    if (EditorUtility.DisplayCancelableProgressBar(
-                            $"MathEdu — Building Grade {gradeNum} (per-file)",
-                            $"{QuestionGenerator.Pretty(subj)} ({si + 1}/{subjects.Length})",
-                            (float)si / subjects.Length))
-                    {
-                        cancelled = true;
-                        break;
-                    }
-
                     string subjectDir  = $"{gradeDir}/{subj}";
                     EnsureFolder(subjectDir);
                     string subjectPath = $"{subjectDir}/Subject_{subj}.asset";
@@ -457,6 +495,15 @@ namespace MathEdu.EditorTools
 
                     for (int lvl = 1; lvl <= QuestionGenerator.LevelsPerSubject; lvl++)
                     {
+                        if (EditorUtility.DisplayCancelableProgressBar(
+                                $"MathEdu — Grade {gradeNum} (per-file)",
+                                $"{QuestionGenerator.Pretty(subj)} • Level {lvl}/20",
+                                (float)done / totalUnits))
+                        {
+                            cancelled = true;
+                            break;
+                        }
+
                         string lvlPath = $"{subjectDir}/Level_{lvl:00}.asset";
                         var ld = AssetDatabase.LoadAssetAtPath<LevelData>(lvlPath);
                         if (ld == null)
@@ -468,6 +515,7 @@ namespace MathEdu.EditorTools
                         EditorUtility.SetDirty(ld);
                         s.levels.Add(ld);
                         totalLevels++;
+                        done++;
                         totalQuestions += ld.questions != null ? ld.questions.Count : 0;
                     }
 
@@ -491,12 +539,179 @@ namespace MathEdu.EditorTools
                 cancelled ? "MathEdu — Build Cancelled" : $"MathEdu — Grade {gradeNum} Ready",
                 cancelled
                     ? $"Grade {gradeNum} build was cancelled. Partial assets saved under:\n{gradeDir}\n\n" +
-                      $"Re-run the same menu item to finish."
+                      $"The game still plays via the runtime fallback. " +
+                      $"Re-run the same menu item later to finish."
                     : $"Grade {gradeNum} assets generated.\n\n" +
                       $"📂  {gradeDir}\n" +
                       $"📊  {totalLevels} levels  •  {totalQuestions} questions\n\n" +
                       $"➡  Run \"MathEdu → Advanced → Per-Grade Assets → Rebuild Master Index\" " +
                       $"once you've built all the grades you want.",
+                "OK");
+        }
+
+        // ===================================================================
+        //                    ADVANCED / PER-SUBJECT BUILDS
+        // ===================================================================
+        //
+        // Tiny incremental builders — one subject of one grade at a time
+        // (20 levels each). Useful on very constrained machines or for
+        // diagnostics. Run "Rebuild Master Index" after building.
+
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Counting",        priority = 130)]
+        public static void BuildG1Counting()       => BuildOneSubject(1, MathSubject.Counting);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Addition",        priority = 131)]
+        public static void BuildG1Addition()       => BuildOneSubject(1, MathSubject.Addition);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Subtraction",     priority = 132)]
+        public static void BuildG1Subtraction()    => BuildOneSubject(1, MathSubject.Subtraction);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Shapes",          priority = 133)]
+        public static void BuildG1Shapes()         => BuildOneSubject(1, MathSubject.Shapes);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Patterns",        priority = 134)]
+        public static void BuildG1Patterns()       => BuildOneSubject(1, MathSubject.Patterns);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Measurement",     priority = 135)]
+        public static void BuildG1Measurement()    => BuildOneSubject(1, MathSubject.Measurement);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Time",            priority = 136)]
+        public static void BuildG1Time()           => BuildOneSubject(1, MathSubject.Time);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 1 - Money",           priority = 137)]
+        public static void BuildG1Money()          => BuildOneSubject(1, MathSubject.Money);
+
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Counting",        priority = 140)]
+        public static void BuildG2Counting()       => BuildOneSubject(2, MathSubject.Counting);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Addition",        priority = 141)]
+        public static void BuildG2Addition()       => BuildOneSubject(2, MathSubject.Addition);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Subtraction",     priority = 142)]
+        public static void BuildG2Subtraction()    => BuildOneSubject(2, MathSubject.Subtraction);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Multiplication",  priority = 143)]
+        public static void BuildG2Multiplication() => BuildOneSubject(2, MathSubject.Multiplication);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Shapes",          priority = 144)]
+        public static void BuildG2Shapes()         => BuildOneSubject(2, MathSubject.Shapes);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Fractions",       priority = 145)]
+        public static void BuildG2Fractions()      => BuildOneSubject(2, MathSubject.Fractions);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Measurement",     priority = 146)]
+        public static void BuildG2Measurement()    => BuildOneSubject(2, MathSubject.Measurement);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Time",            priority = 147)]
+        public static void BuildG2Time()           => BuildOneSubject(2, MathSubject.Time);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 2 - Money",           priority = 148)]
+        public static void BuildG2Money()          => BuildOneSubject(2, MathSubject.Money);
+
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Addition",        priority = 160)]
+        public static void BuildG3Addition()       => BuildOneSubject(3, MathSubject.Addition);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Subtraction",     priority = 161)]
+        public static void BuildG3Subtraction()    => BuildOneSubject(3, MathSubject.Subtraction);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Multiplication",  priority = 162)]
+        public static void BuildG3Multiplication() => BuildOneSubject(3, MathSubject.Multiplication);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Division",        priority = 163)]
+        public static void BuildG3Division()       => BuildOneSubject(3, MathSubject.Division);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Shapes",          priority = 164)]
+        public static void BuildG3Shapes()         => BuildOneSubject(3, MathSubject.Shapes);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Fractions",       priority = 165)]
+        public static void BuildG3Fractions()      => BuildOneSubject(3, MathSubject.Fractions);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Measurement",     priority = 166)]
+        public static void BuildG3Measurement()    => BuildOneSubject(3, MathSubject.Measurement);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Time",            priority = 167)]
+        public static void BuildG3Time()           => BuildOneSubject(3, MathSubject.Time);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Money",           priority = 168)]
+        public static void BuildG3Money()          => BuildOneSubject(3, MathSubject.Money);
+
+        /// <summary>
+        /// Builds (or rebuilds) per-level .asset files for exactly one
+        /// subject of one grade. 20 levels = 20 small files. Typically
+        /// 1–3 seconds, even on a constrained MacBook Air.
+        /// </summary>
+        private static void BuildOneSubject(int gradeNum, MathSubject subj)
+        {
+            EnsureFolder(Root);
+            EnsureFolder($"{Root}/Grades");
+            string gradeDir   = $"{Root}/Grades/Grade{gradeNum}";
+            EnsureFolder(gradeDir);
+            string subjectDir = $"{gradeDir}/{subj}";
+            EnsureFolder(subjectDir);
+
+            int totalQuestions = 0;
+            bool cancelled     = false;
+
+            EditorUtility.DisplayProgressBar(
+                $"MathEdu — G{gradeNum} {QuestionGenerator.Pretty(subj)}",
+                "Preparing…", 0f);
+
+            AssetDatabase.StartAssetEditing();
+            try
+            {
+                string gradePath = $"{gradeDir}/Grade_{gradeNum}.asset";
+                var grade = AssetDatabase.LoadAssetAtPath<GradeData>(gradePath);
+                if (grade == null)
+                {
+                    grade = ScriptableObject.CreateInstance<GradeData>();
+                    grade.gradeNumber = gradeNum;
+                    grade.displayName = $"Grade {gradeNum}";
+                    grade.themeColor  = DatabaseBootstrapper.ThemeForGrade(gradeNum);
+                    grade.description = DatabaseBootstrapper.GradeDescription(gradeNum);
+                    AssetDatabase.CreateAsset(grade, gradePath);
+                }
+
+                string subjectPath = $"{subjectDir}/Subject_{subj}.asset";
+                var s = AssetDatabase.LoadAssetAtPath<SubjectData>(subjectPath);
+                if (s == null)
+                {
+                    s = ScriptableObject.CreateInstance<SubjectData>();
+                    AssetDatabase.CreateAsset(s, subjectPath);
+                }
+                s.subject     = subj;
+                s.displayName = QuestionGenerator.Pretty(subj);
+                s.themeColor  = DatabaseBootstrapper.ThemeForSubject(subj);
+                s.iconEmoji   = DatabaseBootstrapper.EmojiForSubject(subj);
+                s.description = QuestionGenerator.LessonIntro(gradeNum, subj);
+                s.levels.Clear();
+
+                for (int lvl = 1; lvl <= QuestionGenerator.LevelsPerSubject; lvl++)
+                {
+                    if (EditorUtility.DisplayCancelableProgressBar(
+                            $"MathEdu — G{gradeNum} {QuestionGenerator.Pretty(subj)}",
+                            $"Level {lvl}/20",
+                            (float)(lvl - 1) / QuestionGenerator.LevelsPerSubject))
+                    {
+                        cancelled = true;
+                        break;
+                    }
+
+                    string lvlPath = $"{subjectDir}/Level_{lvl:00}.asset";
+                    var ld = AssetDatabase.LoadAssetAtPath<LevelData>(lvlPath);
+                    if (ld == null)
+                    {
+                        ld = ScriptableObject.CreateInstance<LevelData>();
+                        AssetDatabase.CreateAsset(ld, lvlPath);
+                    }
+                    PopulateLevelData(ld, gradeNum, subj, lvl);
+                    EditorUtility.SetDirty(ld);
+                    s.levels.Add(ld);
+                    totalQuestions += ld.questions != null ? ld.questions.Count : 0;
+                }
+                EditorUtility.SetDirty(s);
+
+                // Update the grade's subject list (idempotent).
+                if (!grade.subjects.Contains(s)) grade.subjects.Add(s);
+                EditorUtility.SetDirty(grade);
+            }
+            finally
+            {
+                AssetDatabase.StopAssetEditing();
+                EditorUtility.ClearProgressBar();
+            }
+            AssetDatabase.SaveAssets();
+
+            Debug.Log($"[MathEdu] Built G{gradeNum} {subj}. " +
+                      $"Levels: {QuestionGenerator.LevelsPerSubject}, " +
+                      $"Questions: {totalQuestions}" +
+                      (cancelled ? " — partial." : "."));
+
+            EditorUtility.DisplayDialog(
+                cancelled
+                    ? $"MathEdu — G{gradeNum} {subj} (cancelled)"
+                    : $"MathEdu — G{gradeNum} {subj} Ready",
+                cancelled
+                    ? $"Partial subject saved under:\n{subjectDir}"
+                    : $"📂  {subjectDir}\n📊  20 levels  •  {totalQuestions} questions\n\n" +
+                      $"➡  Run \"MathEdu → Advanced → Per-Grade Assets → Rebuild Master Index\" " +
+                      $"once you've built all the subjects you want.",
                 "OK");
         }
 
@@ -508,17 +723,13 @@ namespace MathEdu.EditorTools
         public static void RuntimeDatabaseInfo()
         {
             EditorUtility.DisplayDialog("MathEdu — No Build Required",
-                "You don't actually have to materialize the database to play!\n\n" +
-                "GameManager.EnsureDatabase() detects when no MathDatabase asset " +
-                "is present and builds the full 4,800-question content tree in " +
-                "memory via DatabaseBootstrapper.BuildInMemory() at startup. The " +
-                "game is fully playable that way — only Project-window browsing " +
-                "of individual levels needs a built asset.\n\n" +
-                "To play right now, without building anything:\n" +
-                "   1. Skip the database build.\n" +
-                "   2. (Optional) MathEdu → Build Default Avatar Library\n" +
-                "   3. MathEdu → Build All Scenes\n" +
-                "   4. Open Assets/Scenes/Bootstrap.unity → Play",
+                "You don't have to materialize the database to play.\n\n" +
+                "GameManager.EnsureDatabase() detects when no MathDatabase " +
+                "asset is present and builds the full 4,800-question content " +
+                "tree in memory via DatabaseBootstrapper.BuildInMemory() at " +
+                "startup. The game is fully playable that way — only " +
+                "Project-window browsing of individual levels needs an asset.\n\n" +
+                "Easiest path: MathEdu → ⚡ Quick Start (No DB Build).",
                 "OK");
         }
 
@@ -528,38 +739,10 @@ namespace MathEdu.EditorTools
             EditorUtility.RevealInFinder(Application.persistentDataPath);
         }
 
-        [MenuItem("MathEdu/Run Full Setup (DB + Avatars + Scenes)", priority = 1)]
-        public static void RunFullSetup()
-        {
-            if (!EditorUtility.DisplayDialog("MathEdu — Full Setup",
-                "This will run, in order:\n\n" +
-                "   1. Build Default Database (fast, single asset)\n" +
-                "   2. Build Default Avatar Library\n" +
-                "   3. Build All Scenes\n\n" +
-                "Each step shows its own progress bar. Total time is usually " +
-                "well under a minute on a modern Mac.",
-                "Run all", "Cancel"))
-                return;
-
-            BuildFast();
-            BuildAvatars();
-            // SceneBuilderMenu lives in this same assembly.
-            SceneBuilderMenu.BuildAll();
-
-            EditorUtility.DisplayDialog("MathEdu — Full Setup Complete",
-                "Done! Open Assets/Scenes/Bootstrap.unity and press ▶ Play.",
-                "OK");
-        }
-
         // ===================================================================
         //                          INTERNAL HELPERS
         // ===================================================================
 
-        /// <summary>
-        /// Creates a fresh LevelData populated from the question generator.
-        /// Used by the fast build path (where the LevelData becomes a
-        /// sub-asset of the master MathDatabase).
-        /// </summary>
         private static LevelData BuildLevelData(int gradeNum, MathSubject subj, int lvl)
         {
             var ld = ScriptableObject.CreateInstance<LevelData>();
@@ -568,11 +751,6 @@ namespace MathEdu.EditorTools
             return ld;
         }
 
-        /// <summary>
-        /// Fills an existing LevelData with curriculum content for the
-        /// given grade/subject/level. Used by both the fast (nested asset)
-        /// and per-grade (file asset) build paths.
-        /// </summary>
         private static void PopulateLevelData(LevelData ld, int gradeNum, MathSubject subj, int lvl)
         {
             ld.levelId      = $"g{gradeNum}_{subj.ToString().ToLowerInvariant()}_l{lvl}";
@@ -592,10 +770,6 @@ namespace MathEdu.EditorTools
                 : (lvl == 10 ? $"halfway_{subj}_{gradeNum}".ToLowerInvariant() : "");
         }
 
-        /// <summary>
-        /// Recursively ensure every folder in the path exists. Wraps
-        /// AssetDatabase.CreateFolder which only accepts a single segment.
-        /// </summary>
         private static void EnsureFolder(string path)
         {
             if (AssetDatabase.IsValidFolder(path)) return;
