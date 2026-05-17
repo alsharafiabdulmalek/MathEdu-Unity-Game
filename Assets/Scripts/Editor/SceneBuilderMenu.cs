@@ -31,18 +31,22 @@ namespace MathEdu.EditorTools
         private const string SceneDir = "Assets/Scenes";
 
         // Scene name -> Manager type that builds the screen at runtime.
+        // Order matters for File > Build Settings (Bootstrap must be scene 0).
         private static readonly (string name, System.Type type)[] Scenes =
         {
-            (UIManager.SceneBootstrap,   typeof(BootstrapManager)),
-            (UIManager.SceneMainMenu,    typeof(MainMenuManager)),
-            (UIManager.SceneLevelSelect, typeof(LevelSelectManager)),
-            (UIManager.SceneModeSelect,  typeof(ModeSelectManager)),
-            (UIManager.SceneLearn,       typeof(LearnModeManager)),
-            (UIManager.ScenePractice,    typeof(PracticeModeManager)),
-            (UIManager.SceneQuiz,        typeof(QuizModeManager)),
-            (UIManager.SceneStory,       typeof(StoryModeManager)),
-            (UIManager.SceneSpeed,       typeof(SpeedRoundManager)),
-            (UIManager.SceneResults,     typeof(ResultsManager)),
+            (UIManager.SceneBootstrap,          typeof(BootstrapManager)),
+            (UIManager.ScenePlayerSetup,        typeof(PlayerSetupManager)),
+            (UIManager.SceneMainMenu,           typeof(MainMenuManager)),
+            (UIManager.SceneLevelSelect,        typeof(LevelSelectManager)),
+            (UIManager.SceneModeSelect,         typeof(ModeSelectManager)),
+            (UIManager.SceneLearn,              typeof(LearnModeManager)),
+            (UIManager.ScenePractice,           typeof(PracticeModeManager)),
+            (UIManager.SceneQuiz,               typeof(QuizModeManager)),
+            (UIManager.SceneStory,              typeof(StoryModeManager)),
+            (UIManager.SceneSpeed,              typeof(SpeedRoundManager)),
+            (UIManager.SceneResults,            typeof(ResultsManager)),
+            (UIManager.SceneSettings,           typeof(SettingsManager)),
+            (UIManager.SceneParentalDashboard,  typeof(ParentalDashboardManager)),
         };
 
         [MenuItem("MathEdu/Build All Scenes", priority = 5)]
