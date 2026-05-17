@@ -5,6 +5,10 @@
 // this builds a complete in-memory MathDatabase so the game still works on a
 // fresh clone with zero authoring. The editor menu under "MathEdu / Build
 // Default Database" creates the same structure as persisted .asset files.
+//
+// Curriculum size:
+//   3 grades × ~9 subjects × 20 levels × 10 questions = ~4,800 questions.
+//   Quiz / Speed Round timers scale from generous (early) to brisk (late).
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -49,12 +53,12 @@ namespace MathEdu.Utility
                         ld.storyIntro    = StoryIntro(subj, gradeNum, lvl);
                         ld.storyOutro    = StoryOutro(subj);
                         ld.questions     = QuestionGenerator.Generate(gradeNum, subj, lvl);
-                        ld.quizSecondsPerQuestion   = Mathf.Lerp(25f, 12f, lvl / 10f);
-                        ld.speedSecondsPerQuestion  = Mathf.Lerp(7f,  3f,  lvl / 10f);
-                        ld.xpReward = 25 + lvl * 5;
+                        ld.quizSecondsPerQuestion   = TimerForQuiz(lvl);
+                        ld.speedSecondsPerQuestion  = TimerForSpeed(lvl);
+                        ld.xpReward = 20 + lvl * 5;
                         ld.badgeId  = lvl == QuestionGenerator.LevelsPerSubject
                             ? $"master_{subj}_{gradeNum}".ToLowerInvariant()
-                            : "";
+                            : (lvl == 10 ? $"halfway_{subj}_{gradeNum}".ToLowerInvariant() : "");
                         s.levels.Add(ld);
                     }
 
@@ -66,6 +70,18 @@ namespace MathEdu.Utility
 
             return db;
         }
+
+        // -------------------------------------------------------------------
+        // Timer curves (used by both the runtime fallback and the editor menu)
+        // -------------------------------------------------------------------
+
+        /// <summary>20-level curve: 30s → 10s, smoother in the middle.</summary>
+        public static float TimerForQuiz(int level) =>
+            Mathf.Lerp(30f, 10f, Mathf.InverseLerp(1, 20, level));
+
+        /// <summary>20-level curve: 8s → 2.5s for Speed Round.</summary>
+        public static float TimerForSpeed(int level) =>
+            Mathf.Lerp(8f, 2.5f, Mathf.InverseLerp(1, 20, level));
 
         // -------------------------------------------------------------------
         // Theming / copy helpers
