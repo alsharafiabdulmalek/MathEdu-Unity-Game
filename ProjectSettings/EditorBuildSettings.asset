@@ -7,32 +7,41 @@ EditorBuildSettings:
   m_Scenes:
   - enabled: 1
     path: Assets/Scenes/Bootstrap.unity
-    guid: 00000000000000000000000000000001
+    guid: ec5e0d06be57e486a9b91ff2b4eb1b0d
+  - enabled: 1
+    path: Assets/Scenes/PlayerSetup.unity
+    guid: a1531618778924711b9d37d5d0ca4775
   - enabled: 1
     path: Assets/Scenes/MainMenu.unity
-    guid: 00000000000000000000000000000002
+    guid: cd8e1a3a9bfc444d28063c93ab8d3ceb
   - enabled: 1
     path: Assets/Scenes/LevelSelect.unity
-    guid: 00000000000000000000000000000003
+    guid: e3949e89e07194ea997679d8262185ce
   - enabled: 1
     path: Assets/Scenes/ModeSelect.unity
-    guid: 00000000000000000000000000000004
+    guid: bc63aca8359c84365abd00877f2c68bb
   - enabled: 1
     path: Assets/Scenes/LearnMode.unity
-    guid: 00000000000000000000000000000005
+    guid: 04b0befea88db46e4b20471eb383bfe6
   - enabled: 1
     path: Assets/Scenes/PracticeMode.unity
-    guid: 00000000000000000000000000000006
+    guid: e9feed807e75043a38a459c459d2cc55
   - enabled: 1
     path: Assets/Scenes/QuizMode.unity
-    guid: 00000000000000000000000000000007
+    guid: 9eb72def2c2914a90908c8f14be7f064
   - enabled: 1
     path: Assets/Scenes/StoryMode.unity
-    guid: 00000000000000000000000000000008
+    guid: e5f9bcb0bd7954a9fb768b4e4e1d4061
   - enabled: 1
     path: Assets/Scenes/SpeedRound.unity
-    guid: 00000000000000000000000000000009
+    guid: c98aef3797fad442eadc242d88cdcbde
   - enabled: 1
     path: Assets/Scenes/Results.unity
-    guid: 0000000000000000000000000000000a
+    guid: 9e99cd7e03f04459993e0f1c030b31a9
+  - enabled: 1
+    path: Assets/Scenes/Settings.unity
+    guid: 71a459454ec1e45ffa377ce9482907c2
+  - enabled: 1
+    path: Assets/Scenes/ParentalDashboard.unity
+    guid: a868d1e19dc9240a7a90b8f3600a8874
   m_configObjects: {}
