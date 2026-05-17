@@ -2,10 +2,11 @@
 // MainMenuManager.cs
 // -----------------------------------------------------------------------------
 // Builds the Main Menu screen at runtime:
+//   - Player name + avatar (top-left)
 //   - Grade selector (1, 2, 3)
 //   - Subject category grid for the selected grade
 //   - Total stars / XP display
-//   - Settings button
+//   - Settings + Parental buttons
 // Choosing a subject takes the player to LevelSelect.
 // -----------------------------------------------------------------------------
 
@@ -39,36 +40,74 @@ namespace MathEdu.Modes
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[MainMenuCanvas]");
             _safeArea = safe;
-            UIFactory.CreateGradientBackground(safe, UIFactory.BgTop, UIFactory.BgBottom);
+            UIFactory.CreateThemedBackground(safe, "menu");
 
-            // Header (title + XP/stars)
+            // -------- Header (avatar + title + XP/stars) -------------------
             var header = UIFactory.CreatePanel(safe,
-                new Vector2(0, 0.88f), new Vector2(1, 1f),
+                new Vector2(0, 0.86f), new Vector2(1, 1f),
                 new Color(0, 0, 0, 0.25f), 0, "Header");
 
-            _titleLabel = UIFactory.CreateText(header, "MathEdu - Learn. Play. Win.", 64,
-                Color.white, TextAlignmentOptions.Center, "Title");
+            // Avatar mini (left)
+            var avatarMini = new GameObject("AvatarMini", typeof(Image));
+            avatarMini.transform.SetParent(header, false);
+            var amrt = (RectTransform)avatarMini.transform;
+            amrt.anchorMin = new Vector2(0, 0); amrt.anchorMax = new Vector2(0, 1);
+            amrt.pivot = new Vector2(0, 0.5f);
+            amrt.sizeDelta = new Vector2(160, 0);
+            amrt.anchoredPosition = new Vector2(24, 0);
+            var amImg = avatarMini.GetComponent<Image>();
+            amImg.sprite = DefaultSprite.Circle();
+            var profile = GameManager.Instance.Profile;
+            var avatar  = GameManager.Instance.Avatars?.FindById(profile.avatarId);
+            amImg.color  = avatar?.tint ?? UIFactory.Accent;
+            if (avatar != null && avatar.sprite != null)
+            {
+                amImg.sprite = avatar.sprite;
+                amImg.color  = Color.white;
+                amImg.preserveAspect = true;
+            }
+            else if (avatar != null)
+            {
+                var em = UIFactory.CreateText(amrt, avatar.emoji, 80, Color.white,
+                    TextAlignmentOptions.Center, "Em");
+                em.fontStyle = FontStyles.Bold;
+            }
+
+            // Name + Welcome
+            var nameLbl = UIFactory.CreateText(header,
+                $"Hi {profile.playerName}!", 38,
+                Color.white, TextAlignmentOptions.MidlineLeft, "Welcome");
+            nameLbl.fontStyle = FontStyles.Bold;
+            var nrt = nameLbl.rectTransform;
+            nrt.anchorMin = new Vector2(0, 0); nrt.anchorMax = new Vector2(0.7f, 0.55f);
+            nrt.offsetMin = new Vector2(200, 0); nrt.offsetMax = new Vector2(0, 0);
+
+            _titleLabel = UIFactory.CreateText(header, "MathEdu - Learn. Play. Win.", 56,
+                Color.white, TextAlignmentOptions.MidlineLeft, "Title");
             _titleLabel.fontStyle = FontStyles.Bold;
+            var trt = _titleLabel.rectTransform;
+            trt.anchorMin = new Vector2(0, 0.55f); trt.anchorMax = new Vector2(0.7f, 1);
+            trt.offsetMin = new Vector2(200, 0); trt.offsetMax = new Vector2(0, 0);
 
             var statsHolder = new GameObject("Stats", typeof(RectTransform));
             statsHolder.transform.SetParent(header, false);
             var sh = (RectTransform)statsHolder.transform;
-            sh.anchorMin = new Vector2(0.6f, 0);
-            sh.anchorMax = new Vector2(1, 0.45f);
+            sh.anchorMin = new Vector2(0.65f, 0);
+            sh.anchorMax = new Vector2(1, 1f);
             sh.offsetMin = new Vector2(0, 0); sh.offsetMax = new Vector2(-24, 0);
             var hl = statsHolder.AddComponent<HorizontalLayoutGroup>();
             hl.childAlignment = TextAnchor.MiddleRight;
             hl.spacing = 24;
             hl.childForceExpandWidth = false;
 
-            _starsLabel = UIFactory.CreateText(sh, $"★ {GameManager.Instance.Profile.totalStars}",
+            _starsLabel = UIFactory.CreateText(sh, $"★ {profile.totalStars}",
                 36, UIFactory.Accent, TextAlignmentOptions.MidlineRight, "StarsLabel");
-            _xpLabel    = UIFactory.CreateText(sh, $"XP {GameManager.Instance.Profile.xp}",
+            _xpLabel    = UIFactory.CreateText(sh, $"XP {profile.xp}",
                 36, Color.white, TextAlignmentOptions.MidlineRight, "XPLabel");
 
-            // Grade selector strip
+            // -------- Grade selector strip ---------------------------------
             var gradeStrip = UIFactory.CreatePanel(safe,
-                new Vector2(0, 0.78f), new Vector2(1, 0.88f),
+                new Vector2(0, 0.78f), new Vector2(1, 0.86f),
                 new Color(0, 0, 0, 0.20f), 0, "GradeStrip");
 
             var gradeLayout = UIFactory.CreateHorizontalLayout(gradeStrip, 24,
@@ -93,7 +132,7 @@ namespace MathEdu.Modes
                 le.preferredWidth = 240; le.preferredHeight = 120;
             }
 
-            // Subject grid
+            // -------- Subject grid -----------------------------------------
             var gridScroll = UIFactory.CreateScrollView(safe, "SubjectScroll");
             var grt = (RectTransform)gridScroll.transform;
             grt.anchorMin = new Vector2(0, 0.12f); grt.anchorMax = new Vector2(1, 0.78f);
@@ -111,7 +150,7 @@ namespace MathEdu.Modes
 
             RebuildSubjectGrid();
 
-            // Bottom action strip
+            // -------- Bottom action strip ----------------------------------
             var bottom = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0), new Vector2(1, 0.12f),
                 new Color(0, 0, 0, 0.30f), 0, "Bottom");
@@ -130,6 +169,10 @@ namespace MathEdu.Modes
             var settingsBtn = UIFactory.CreateIconButton((RectTransform)hLayout.transform,
                 "⚙", new Color(0.30f, 0.35f, 0.45f), "SettingsBtn");
             settingsBtn.onClick.AddListener(OnSettings);
+
+            var parentBtn = UIFactory.CreateIconButton((RectTransform)hLayout.transform,
+                "👪", new Color(0.50f, 0.30f, 0.55f), "ParentBtn");
+            parentBtn.onClick.AddListener(OnParent);
         }
 
         private void RebuildSubjectGrid()
@@ -197,6 +240,9 @@ namespace MathEdu.Modes
             return s;
         }
 
+        // -------------------------------------------------------------------
+        // Event handlers
+        // -------------------------------------------------------------------
         private void OnGradeSelected(int g)
         {
             GameManager.Instance.Audio.PlayTap();
@@ -204,8 +250,6 @@ namespace MathEdu.Modes
             GameManager.Instance.SelectGrade(g);
             GameManager.Instance.SaveProfile();
 
-            // Destroy the existing canvas (synchronously) and rebuild so the
-            // grade-button highlight and subject grid both refresh together.
             var oldCanvas = GameObject.Find("[MainMenuCanvas]");
             if (oldCanvas != null) DestroyImmediate(oldCanvas);
             Build();
@@ -232,11 +276,13 @@ namespace MathEdu.Modes
         private void OnSettings()
         {
             GameManager.Instance.Audio.PlayTap();
-            var profile = GameManager.Instance.Profile;
-            profile.musicVolume = (profile.musicVolume + 0.25f) % 1.25f;
-            profile.sfxVolume   = profile.musicVolume;
-            GameManager.Instance.Audio.ApplyVolumeFromProfile();
-            GameManager.Instance.SaveProfile();
+            GameManager.Instance.UI.Go(UIManager.SceneSettings);
+        }
+
+        private void OnParent()
+        {
+            GameManager.Instance.Audio.PlayTap();
+            GameManager.Instance.UI.Go(UIManager.SceneParentalDashboard);
         }
     }
 }
