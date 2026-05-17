@@ -1,11 +1,21 @@
 // -----------------------------------------------------------------------------
 // LearnModeManager.cs
 // -----------------------------------------------------------------------------
-// A guided lesson, not a quiz: shows the lesson intro / example / tip, then
-// walks the player through a handful of "Try it!" questions with full hints
-// shown automatically. Designed as the gentlest on-ramp to a new topic.
+// Guided lesson, structured per spec 3B:
+//   1. Intro card (lessonIntro text + lessonExample).
+//   2. Three auto-reveal example questions:
+//        • show the question + 4 options
+//        • 1.5 s later highlight the correct option in green
+//        • show the hint as scaffolding
+//        • after 2.5 s more fade and move to the next example
+//   3. "Now it's YOUR turn!" transition for 1.5 s.
+//   4. 7 practice questions (untimed) with the hint visible at all times.
+//
+// No scoring; finishing routes back to Mode Select. Designed as the gentlest
+// on-ramp to a new topic.
 // -----------------------------------------------------------------------------
 
+using System.Collections;
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
@@ -18,27 +28,33 @@ namespace MathEdu.Modes
     public class LearnModeManager : MonoBehaviour
     {
         private LevelData _level;
-
-        private RectTransform _content;
-        private RectTransform _ctaHolder;
-        private TextMeshProUGUI _stepLabel;
+        private RectTransform _safeArea;
+        private RectTransform _stage;
+        private TextMeshProUGUI _stageLabel;
         private TextMeshProUGUI _bodyLabel;
-        private TextMeshProUGUI _exampleLabel;
+        private TextMeshProUGUI _hintLabel;
+        private RectTransform _answersHolder;
+        private CanvasGroup _cardGroup;
 
-        private int _step;
+        private const int ExampleCount = 3;
+        private const int PracticeCount = 7;
+
+        private int _practiceIndex;
+        private bool _locked;
 
         private void Start()
         {
             _ = GameManager.Instance;
             _level = GameManager.Instance.CurrentLevel;
             if (_level == null) { GameManager.Instance.UI.Go(UIManager.SceneMainMenu); return; }
-            Build();
-            ShowStep(0);
+            BuildUI();
+            StartCoroutine(IntroFlow());
         }
 
-        private void Build()
+        private void BuildUI()
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[LearnCanvas]");
+            _safeArea = safe;
             UIFactory.CreateGradientBackground(safe, UIFactory.BgTop, UIFactory.BgBottom);
 
             var header = UIFactory.CreatePanel(safe,
@@ -53,143 +69,253 @@ namespace MathEdu.Modes
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
             brt.sizeDelta = new Vector2(110, 110);
-            back.onClick.AddListener(() => GameManager.Instance.UI.Go(UIManager.SceneModeSelect));
+            back.onClick.AddListener(() =>
+            {
+                GameManager.Instance.Audio.PlaySFX("tap");
+                GameManager.Instance.UI.Go(UIManager.SceneModeSelect);
+            });
 
-            var stepHolder = UIFactory.CreatePanel(safe,
+            var stageHolder = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.82f), new Vector2(1, 0.88f),
-                new Color(0, 0, 0, 0.25f), 0, "StepHolder");
-            _stepLabel = UIFactory.CreateText(stepHolder,
-                "", 32, Color.white, TextAlignmentOptions.Center, "Step");
+                new Color(0, 0, 0, 0.25f), 0, "StageHolder");
+            _stageLabel = UIFactory.CreateText(stageHolder,
+                "", 32, Color.white, TextAlignmentOptions.Center, "Stage");
 
             var card = UIFactory.CreatePanel(safe,
-                new Vector2(0.05f, 0.20f), new Vector2(0.95f, 0.80f),
+                new Vector2(0.05f, 0.42f), new Vector2(0.95f, 0.80f),
                 UIFactory.Card, 28, "Content");
+            _cardGroup = card.gameObject.AddComponent<CanvasGroup>();
+            _stage = card;
 
-            var col = UIFactory.CreateVerticalLayout(card, 24,
-                new RectOffset(32, 32, 32, 32), "Col");
+            var col = UIFactory.CreateVerticalLayout(card, 16,
+                new RectOffset(28, 28, 28, 28), "Col");
             var crt = (RectTransform)col.transform;
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
             _bodyLabel = UIFactory.CreateText((RectTransform)col.transform, "",
-                44, UIFactory.TextDark, TextAlignmentOptions.Center, "Body");
+                42, UIFactory.TextDark, TextAlignmentOptions.Center, "Body");
             var ble = _bodyLabel.gameObject.AddComponent<LayoutElement>();
-            ble.preferredHeight = 260;
+            ble.preferredHeight = 220;
 
-            _exampleLabel = UIFactory.CreateText((RectTransform)col.transform, "",
-                40, UIFactory.Primary, TextAlignmentOptions.Center, "Example");
-            _exampleLabel.fontStyle = FontStyles.Bold;
-            _content = (RectTransform)col.transform;
+            _hintLabel = UIFactory.CreateText((RectTransform)col.transform, "",
+                30, UIFactory.Primary, TextAlignmentOptions.Center, "Hint");
+            _hintLabel.fontStyle = FontStyles.Italic;
+            var hle = _hintLabel.gameObject.AddComponent<LayoutElement>();
+            hle.preferredHeight = 80;
 
-            var ctaPanel = UIFactory.CreatePanel(safe,
-                new Vector2(0, 0), new Vector2(1, 0.18f),
-                new Color(0, 0, 0, 0.25f), 0, "CTA");
-            _ctaHolder = ctaPanel;
-            var hl = ctaPanel.gameObject.AddComponent<HorizontalLayoutGroup>();
-            hl.padding = new RectOffset(40, 40, 16, 16);
-            hl.spacing = 32;
-            hl.childForceExpandWidth = true;
-            hl.childAlignment = TextAnchor.MiddleCenter;
+            // Answer button grid lives in its own panel beneath the card.
+            var answersPanel = UIFactory.CreatePanel(safe,
+                new Vector2(0.05f, 0.06f), new Vector2(0.95f, 0.40f),
+                new Color(0, 0, 0, 0.15f), 24, "AnswersPanel");
+            var grid = answersPanel.gameObject.AddComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(440, 140);
+            grid.spacing  = new Vector2(20, 20);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 2;
+            grid.padding = new RectOffset(24, 24, 24, 24);
+            grid.childAlignment = TextAnchor.MiddleCenter;
+            _answersHolder = answersPanel;
         }
 
-        private void ShowStep(int step)
+        // -------------------------------------------------------------------
+        // Flow
+        // -------------------------------------------------------------------
+        private IEnumerator IntroFlow()
         {
-            _step = step;
-            ClearCTA();
+            _stageLabel.text = "Lesson";
+            _bodyLabel.text  = _level.lessonIntro;
+            _hintLabel.text  = _level.lessonExample;
+            ClearAnswers();
 
-            int tryCount = Mathf.Min(3, _level.questions?.Count ?? 0);
-            int totalSteps = 3 + tryCount;
-            _stepLabel.text = $"Step {Mathf.Min(step + 1, totalSteps)} / {totalSteps}";
+            yield return new WaitForSeconds(2.5f);
 
-            if (step == 0)
+            // 3 auto-reveal examples
+            int taken = 0;
+            for (int i = 0; i < _level.questions.Count && taken < ExampleCount; i++)
             {
-                _bodyLabel.text    = _level.lessonIntro;
-                _exampleLabel.text = "";
-                AddCTA("Show example", () => ShowStep(1));
+                var q = _level.questions[i];
+                if (q == null || !q.IsValid()) continue;
+                yield return PlayExample(taken + 1, q);
+                taken++;
             }
-            else if (step == 1)
+
+            // Transition
+            _stageLabel.text = "Practice";
+            _bodyLabel.text  = "Now it's YOUR turn! 💪";
+            _hintLabel.text  = _level.lessonTip;
+            ClearAnswers();
+            yield return new WaitForSeconds(1.5f);
+
+            // 7 practice questions
+            int practiced = 0;
+            for (int i = ExampleCount; i < _level.questions.Count && practiced < PracticeCount; i++)
             {
-                _bodyLabel.text    = "Look carefully:";
-                _exampleLabel.text = _level.lessonExample;
-                AddCTA("Got it!", () => ShowStep(2));
+                var q = _level.questions[i];
+                if (q == null || !q.IsValid()) continue;
+                yield return PlayPractice(q, practiced + 1);
+                practiced++;
             }
-            else if (step == 2)
+
+            // Wrap-up
+            _stageLabel.text = "Done!";
+            _bodyLabel.text  = "Great job — you finished the lesson!";
+            _hintLabel.text  = "Try Practice or Quiz mode next.";
+            ClearAnswers();
+            AddCTA("Back to modes",
+                () => GameManager.Instance.UI.Go(UIManager.SceneModeSelect));
+            AddCTA("Practice now", () =>
             {
-                _bodyLabel.text    = _level.lessonTip;
-                _exampleLabel.text = "Ready to try?";
-                AddCTA("Try it!", () => ShowStep(3));
-            }
-            else
-            {
-                int qIndex = step - 3;
-                if (qIndex >= tryCount || qIndex >= _level.questions.Count)
-                {
-                    _bodyLabel.text = "You did it! You can now try Practice or Quiz mode.";
-                    _exampleLabel.text = "";
-                    AddCTA("Back to modes",
-                        () => GameManager.Instance.UI.Go(UIManager.SceneModeSelect));
-                    AddCTA("Practice now",
-                        () =>
-                        {
-                            GameManager.Instance.SelectMode(LearningMode.Practice);
-                            GameManager.Instance.UI.Go(UIManager.ScenePractice);
-                        });
-                    return;
-                }
-                ShowTryItQuestion(_level.questions[qIndex]);
-            }
+                GameManager.Instance.SelectMode(LearningMode.Practice);
+                GameManager.Instance.UI.Go(UIManager.ScenePractice);
+            });
         }
 
-        private void ShowTryItQuestion(MathQuestion q)
+        private IEnumerator PlayExample(int idx, MathQuestion q)
         {
-            _bodyLabel.text    = q.prompt;
-            _exampleLabel.text = $"💡 {q.hint}";
+            _stageLabel.text = $"Example {idx} / {ExampleCount}";
+            _bodyLabel.text  = q.prompt;
+            _hintLabel.text  = "";
+            ClearAnswers();
 
-            ClearCTA();
-            var hl = _ctaHolder.GetComponent<HorizontalLayoutGroup>();
-            hl.spacing = 16;
-            hl.padding = new RectOffset(24, 24, 24, 24);
-
+            // Spawn read-only answer buttons
+            var btns = new Button[q.options.Length];
             for (int i = 0; i < q.options.Length; i++)
             {
-                int captured = i;
-                var btn = UIFactory.CreateButton(_ctaHolder, q.options[i],
-                    UIFactory.Card, 40, $"TryBtn_{i}");
-                var label = btn.GetComponentInChildren<TextMeshProUGUI>();
-                label.color = UIFactory.TextDark;
-                btn.onClick.AddListener(() => OnTryAnswer(captured, q, btn));
+                btns[i] = UIFactory.CreateButton(_answersHolder, q.options[i],
+                    UIFactory.Card, 40, $"Ex_{idx}_{i}");
+                var lbl = btns[i].GetComponentInChildren<TextMeshProUGUI>();
+                lbl.color = UIFactory.TextDark;
+                btns[i].interactable = false;
             }
+
+            yield return FadeCard(0f, 1f, 0.25f);
+
+            // 1.5s pause — let the eye scan options.
+            yield return new WaitForSeconds(1.5f);
+
+            // Highlight correct answer.
+            if (q.correctIndex >= 0 && q.correctIndex < btns.Length)
+            {
+                var img = btns[q.correctIndex].GetComponent<Image>();
+                img.color = UIFactory.Success;
+                var lbl = btns[q.correctIndex].GetComponentInChildren<TextMeshProUGUI>();
+                lbl.color = Color.white;
+                GameManager.Instance.Audio.PlaySFX("correct");
+            }
+            _hintLabel.text = $"💡 {q.hint}";
+
+            // 2.5s more, then fade out.
+            yield return new WaitForSeconds(2.5f);
+            yield return FadeCard(1f, 0f, 0.25f);
         }
 
-        private void OnTryAnswer(int chosen, MathQuestion q, Button btn)
+        private IEnumerator PlayPractice(MathQuestion q, int idx)
         {
-            if (q.IsCorrect(chosen))
+            _stageLabel.text = $"Practice {idx} / {PracticeCount}";
+            _bodyLabel.text  = q.prompt;
+            _hintLabel.text  = $"💡 {q.hint}";
+            ClearAnswers();
+            _locked = false;
+
+            var shuffled = GameplayBase_ShuffleOptions(q);
+            bool answered = false;
+            int chosenIndex = -1;
+
+            for (int i = 0; i < shuffled.options.Length; i++)
             {
-                GameManager.Instance.Audio.PlayCorrect();
-                btn.GetComponent<Image>().color = UIFactory.Success;
-                Invoke(nameof(NextStep), 0.6f);
+                int captured = i;
+                var btn = UIFactory.CreateButton(_answersHolder, shuffled.options[i],
+                    UIFactory.Card, 40, $"Pra_{idx}_{i}");
+                var lbl = btn.GetComponentInChildren<TextMeshProUGUI>();
+                lbl.color = UIFactory.TextDark;
+                btn.onClick.AddListener(() =>
+                {
+                    if (_locked) return;
+                    _locked = true;
+                    chosenIndex = captured;
+                    answered = true;
+                    bool ok = shuffled.IsCorrect(captured);
+                    var img = btn.GetComponent<Image>();
+                    if (ok)
+                    {
+                        img.color = UIFactory.Success;
+                        GameManager.Instance.Audio.PlaySFX("correct");
+                        HapticManager.Light();
+                    }
+                    else
+                    {
+                        img.color = UIFactory.Danger;
+                        GameManager.Instance.Audio.PlaySFX("wrong");
+                    }
+                });
             }
-            else
-            {
-                GameManager.Instance.Audio.PlayWrong();
-                btn.GetComponent<Image>().color = UIFactory.Danger;
-                _exampleLabel.text = $"Not quite! Hint: {q.hint}";
-            }
+            yield return FadeCard(0f, 1f, 0.20f);
+
+            // Wait for an answer (no timeout).
+            while (!answered) yield return null;
+
+            // Short reveal pause to let the player see whether they were right.
+            yield return new WaitForSeconds(0.8f);
+            yield return FadeCard(1f, 0f, 0.25f);
         }
 
-        private void NextStep() => ShowStep(_step + 1);
+        private IEnumerator FadeCard(float from, float to, float dur)
+        {
+            if (_cardGroup == null) yield break;
+            float t = 0;
+            while (t < dur)
+            {
+                t += Time.unscaledDeltaTime;
+                _cardGroup.alpha = Mathf.Lerp(from, to, t / dur);
+                yield return null;
+            }
+            _cardGroup.alpha = to;
+        }
+
+        private void ClearAnswers()
+        {
+            if (_answersHolder == null) return;
+            for (int i = _answersHolder.childCount - 1; i >= 0; i--)
+                Destroy(_answersHolder.GetChild(i).gameObject);
+        }
 
         private void AddCTA(string label, UnityEngine.Events.UnityAction action)
         {
-            var btn = UIFactory.CreateButton(_ctaHolder, label, UIFactory.Primary, 44, $"CTA_{label}");
+            var btn = UIFactory.CreateButton(_answersHolder, label,
+                UIFactory.Primary, 44, $"CTA_{label}");
             btn.onClick.AddListener(action);
         }
 
-        private void ClearCTA()
+        // Slim copy of GameplayManagerBase.ShuffleOptions so LearnMode can
+        // reshuffle without inheriting the gameplay loop.
+        private static MathQuestion GameplayBase_ShuffleOptions(MathQuestion q)
         {
-            if (_ctaHolder == null) return;
-            for (int i = _ctaHolder.childCount - 1; i >= 0; i--)
-                Destroy(_ctaHolder.GetChild(i).gameObject);
+            var indices = new int[] { 0, 1, 2, 3 };
+            for (int i = 3; i > 0; i--)
+            {
+                int j = Random.Range(0, i + 1);
+                (indices[i], indices[j]) = (indices[j], indices[i]);
+            }
+            var newOpts = new string[4];
+            int newCorrect = 0;
+            for (int slot = 0; slot < 4; slot++)
+            {
+                int src = indices[slot];
+                newOpts[slot] = q.options[src];
+                if (src == q.correctIndex) newCorrect = slot;
+            }
+            return new MathQuestion
+            {
+                prompt        = q.prompt,
+                options       = newOpts,
+                correctIndex  = newCorrect,
+                hint          = q.hint,
+                explanation   = q.explanation,
+                difficulty    = q.difficulty,
+                visual        = q.visual,
+                visualPayload = q.visualPayload
+            };
         }
     }
 }
