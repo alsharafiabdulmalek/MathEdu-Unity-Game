@@ -2,11 +2,17 @@
 // GameManager.cs
 // -----------------------------------------------------------------------------
 // Persistent root singleton. Holds the MathDatabase, the current PlayerProfile,
-// the active GameSession, and the manager references (Audio, Progress, UI).
+// the active GameSession, and the manager references (Audio, Progress, UI,
+// VFX). Auto-creates itself the first time anyone calls GameManager.Instance
+// so scenes can be played standalone in the editor.
 //
-// Auto-creates itself the first time anyone calls GameManager.Instance so
-// scenes can be played standalone in the editor (Bootstrap → Main Menu →
-// any other scene) without manual setup.
+// New responsibilities since the initial release:
+//   • Loads (and exposes) the optional AvatarLibrary for the Player Setup
+//     screen — falls back to a runtime-built default library.
+//   • Owns a VFXManager so any scene can fire Epic Toon FX prefabs through
+//     `GameManager.Instance.VFX.PlayCorrect()`.
+//   • Tracks per-subject statistics through ProgressManager so the Parental
+//     Dashboard always has fresh numbers.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -40,14 +46,17 @@ namespace MathEdu.Managers
 
         // ------------------------------------------------------ state ------
         [Header("Master Data (optional, auto-built if null)")]
-        public MathDatabase database;
+        public MathDatabase   database;
+        public AvatarLibrary  avatarLibrary;
 
         public PlayerProfile  Profile { get; private set; }
         public GameSession    Session { get; private set; } = new GameSession();
+        public AvatarLibrary  Avatars => avatarLibrary;
 
         public AudioManager    Audio    { get; private set; }
         public ProgressManager Progress { get; private set; }
         public UIManager       UI       { get; private set; }
+        public VFXManager      VFX      { get; private set; }
 
         // ------------------------------------------------------ lifecycle --
         private void Awake()
@@ -61,14 +70,17 @@ namespace MathEdu.Managers
             DontDestroyOnLoad(gameObject);
 
             EnsureDatabase();
+            EnsureAvatarLibrary();
             Profile  = SaveSystem.Load();
             UnlockStartingLevels();
 
             Audio    = gameObject.AddComponent<AudioManager>();
             Progress = gameObject.AddComponent<ProgressManager>();
             UI       = gameObject.AddComponent<UIManager>();
+            VFX      = gameObject.AddComponent<VFXManager>();
 
             Audio.Init(Profile);
+            VFX.Init();
         }
 
         private void OnApplicationPause(bool paused)
@@ -100,6 +112,19 @@ namespace MathEdu.Managers
             Debug.Log($"[GameManager] Built runtime MathDatabase with {database.TotalQuestionCount} questions.");
         }
 
+        private void EnsureAvatarLibrary()
+        {
+            if (avatarLibrary != null && avatarLibrary.avatars.Count > 0) return;
+
+            var fromResources = Resources.Load<AvatarLibrary>("AvatarLibrary");
+            if (fromResources != null && fromResources.avatars.Count > 0)
+            {
+                avatarLibrary = fromResources;
+                return;
+            }
+            avatarLibrary = AvatarLibrary.BuildDefault();
+        }
+
         private void UnlockStartingLevels()
         {
             if (Profile == null || database == null) return;
@@ -115,9 +140,9 @@ namespace MathEdu.Managers
         }
 
         // ------------------------------------------------------ API --------
-        public void SelectGrade(int g)       { Session.selectedGrade = g; Profile.selectedGrade = g; }
+        public void SelectGrade(int g)        { Session.selectedGrade = g; Profile.selectedGrade = g; }
         public void SelectSubject(MathSubject s) { Session.selectedSubject = s; }
-        public void SelectLevel(int l)       { Session.selectedLevel = l; }
+        public void SelectLevel(int l)        { Session.selectedLevel = l; }
         public void SelectMode(LearningMode m){ Session.selectedMode = m; }
 
         public LevelData CurrentLevel =>
