@@ -8,15 +8,23 @@
 //   • Per-subject accuracy bar chart
 //   • Per-subject table: questions answered, levels completed, last played
 //   • Per-grade level completion percentage
+//   • Earned badges list (emoji + pretty name)
 //
-// The dashboard refuses to render until the user enters the parental PIN. The
-// default PIN is "0000" — the Settings screen lets parents change it.
-//
-// All numbers come straight off PlayerProfile.subjectStats so no extra walks
-// over the database are required.
+// PIN gate (spec 2I):
+//   • Default PIN is "0000" (PlayerProfile.parentalPin initialised on first
+//     save). Settings → Change PIN reveals the standard 3-step flow.
+//   • Entry uses a 4-digit pad built from 10 number buttons + backspace +
+//     confirm. Pad is built procedurally via UIFactory.
+//   • Wrong PIN shakes the dot display and clears it. No error text reveals
+//     the PIN length.
+//   • 3 wrong attempts in a row disables the keypad for 30 seconds with a
+//     visible countdown.
+//   • Correct PIN slides the gate panel up over 0.4 s and reveals the
+//     dashboard beneath it.
 // -----------------------------------------------------------------------------
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using MathEdu.Data;
 using MathEdu.UI;
@@ -32,22 +40,38 @@ namespace MathEdu.Managers
         private PlayerProfile _profile;
         private bool _unlocked;
 
+        // PIN gate widgets
+        private RectTransform _gatePanel;
+        private Image[] _dotImages;
+        private string _entered = "";
+        private int _wrongAttempts = 0;
+        private List<Button> _keypadButtons = new List<Button>();
+        private TextMeshProUGUI _lockoutLabel;
+        private bool _locked;
+
         private void Start()
         {
             _ = GameManager.Instance;
             _profile = GameManager.Instance.Profile;
+            BuildDashboard();   // build first (sits beneath the gate)
             BuildLockScreen();
         }
 
         // -------------------------------------------------------------------
-        // PIN gate
+        // PIN gate (keypad)
         // -------------------------------------------------------------------
         private void BuildLockScreen()
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[ParentalGateCanvas]");
+            canvas.sortingOrder = 500;
             UIFactory.CreateThemedBackground(safe, "parental");
 
-            var header = UIFactory.CreatePanel(safe,
+            _gatePanel = UIFactory.CreatePanel(safe,
+                Vector2.zero, Vector2.one,
+                new Color(0.15f, 0.20f, 0.30f, 0.97f), 0, "GatePanel");
+
+            // Header
+            var header = UIFactory.CreatePanel(_gatePanel,
                 new Vector2(0, 0.88f), new Vector2(1, 1f),
                 new Color(0.30f, 0.35f, 0.45f), 0, "Header");
             UIFactory.CreateText(header, "Parental Dashboard", 56,
@@ -58,60 +82,215 @@ namespace MathEdu.Managers
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
             brt.sizeDelta = new Vector2(110, 110);
-            back.onClick.AddListener(() => GameManager.Instance.UI.Go(UIManager.SceneMainMenu));
+            back.onClick.AddListener(() =>
+            {
+                GameManager.Instance.Audio.PlaySFX("tap");
+                GameManager.Instance.UI.Go(UIManager.SceneMainMenu);
+            });
 
-            var card = UIFactory.CreatePanel(safe,
-                new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.78f),
-                UIFactory.Card, 32, "LockCard");
-            var col = UIFactory.CreateVerticalLayout(card, 20,
-                new RectOffset(28, 28, 28, 28), "Col");
+            // Card holding the dots + keypad
+            var card = UIFactory.CreatePanel(_gatePanel,
+                new Vector2(0.06f, 0.10f), new Vector2(0.94f, 0.84f),
+                UIFactory.Card, 32, "GateCard");
+            var col = UIFactory.CreateVerticalLayout(card, 24,
+                new RectOffset(32, 32, 32, 32), "Col");
             var crt = (RectTransform)col.transform;
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "🔒  For Parents",
-                64, UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
+            UIFactory.CreateText((RectTransform)col.transform, "🔒 For Parents", 64,
+                UIFactory.TextDark, TextAlignmentOptions.Center, "Lbl")
                 .fontStyle = FontStyles.Bold;
-
             UIFactory.CreateText((RectTransform)col.transform,
-                "Enter the parental PIN to see your child's progress.\nDefault PIN: 0000",
-                30, UIFactory.TextDark, TextAlignmentOptions.Center, "Sub");
+                "Enter your PIN. Default is 0000.", 28,
+                UIFactory.TextDark, TextAlignmentOptions.Center, "Sub");
 
-            var input = UIFactory.CreateInputField((RectTransform)col.transform,
-                "Enter PIN", 48, "PinInput");
-            input.contentType = TMP_InputField.ContentType.Pin;
-            input.characterLimit = 8;
-            var ile = input.gameObject.AddComponent<LayoutElement>();
-            ile.preferredHeight = 130;
+            // PIN dots row
+            BuildDotsRow((RectTransform)col.transform);
 
-            var unlockBtn = UIFactory.CreateButton((RectTransform)col.transform,
-                "Unlock", UIFactory.Primary, 44, "Unlock");
-            var ule = unlockBtn.gameObject.AddComponent<LayoutElement>();
-            ule.preferredHeight = 130;
-            unlockBtn.onClick.AddListener(() =>
-            {
-                if (input.text == _profile.parentalPin)
-                {
-                    _unlocked = true;
-                    DestroyAllCanvases();
-                    BuildDashboard();
-                }
-                else
-                {
-                    input.text = "";
-                    GameManager.Instance.Audio.PlayWrong();
-                }
-            });
+            // Lockout label (hidden by default)
+            _lockoutLabel = UIFactory.CreateText((RectTransform)col.transform,
+                "", 32, UIFactory.Danger, TextAlignmentOptions.Center, "LockoutLbl");
+            _lockoutLabel.gameObject.AddComponent<LayoutElement>().preferredHeight = 50;
+
+            // Keypad
+            BuildKeypad((RectTransform)col.transform);
         }
 
-        private void DestroyAllCanvases()
+        private void BuildDotsRow(RectTransform parent)
         {
-            var gateCanvas = GameObject.Find("[ParentalGateCanvas]");
-            if (gateCanvas != null) DestroyImmediate(gateCanvas);
+            var row = new GameObject("Dots",
+                typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            row.transform.SetParent(parent, false);
+            row.GetComponent<HorizontalLayoutGroup>().spacing = 24;
+            row.GetComponent<HorizontalLayoutGroup>().childAlignment = TextAnchor.MiddleCenter;
+            row.GetComponent<LayoutElement>().preferredHeight = 90;
+
+            _dotImages = new Image[4];
+            for (int i = 0; i < 4; i++)
+            {
+                var dot = new GameObject($"Dot_{i}", typeof(Image), typeof(LayoutElement));
+                dot.transform.SetParent(row.transform, false);
+                var le = dot.GetComponent<LayoutElement>();
+                le.preferredWidth = 60; le.preferredHeight = 60;
+                var img = dot.GetComponent<Image>();
+                img.sprite = DefaultSprite.Circle();
+                img.color = new Color(0.6f, 0.6f, 0.6f, 0.4f);
+                _dotImages[i] = img;
+            }
+        }
+
+        private void BuildKeypad(RectTransform parent)
+        {
+            var pad = new GameObject("Keypad",
+                typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+            pad.transform.SetParent(parent, false);
+            var grid = pad.GetComponent<GridLayoutGroup>();
+            grid.cellSize = new Vector2(180, 180);
+            grid.spacing  = new Vector2(16, 16);
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 3;
+            grid.childAlignment = TextAnchor.MiddleCenter;
+            pad.GetComponent<LayoutElement>().preferredHeight = 780;
+
+            _keypadButtons.Clear();
+            // 1..9
+            for (int n = 1; n <= 9; n++)
+            {
+                int captured = n;
+                var btn = UIFactory.CreateButton((RectTransform)pad.transform,
+                    captured.ToString(), UIFactory.Primary, 56, $"Key_{captured}");
+                btn.onClick.AddListener(() => PressDigit(captured.ToString()));
+                _keypadButtons.Add(btn);
+            }
+            // Backspace, 0, Confirm
+            var backBtn = UIFactory.CreateButton((RectTransform)pad.transform,
+                "⌫", new Color(0.65f, 0.45f, 0.45f), 56, "Key_Back");
+            backBtn.onClick.AddListener(PressBackspace);
+            _keypadButtons.Add(backBtn);
+
+            var zero = UIFactory.CreateButton((RectTransform)pad.transform,
+                "0", UIFactory.Primary, 56, "Key_0");
+            zero.onClick.AddListener(() => PressDigit("0"));
+            _keypadButtons.Add(zero);
+
+            var ok = UIFactory.CreateButton((RectTransform)pad.transform,
+                "OK", UIFactory.Success, 56, "Key_OK");
+            ok.onClick.AddListener(PressConfirm);
+            _keypadButtons.Add(ok);
+        }
+
+        private void PressDigit(string d)
+        {
+            if (_locked || _unlocked) return;
+            GameManager.Instance.Audio.PlaySFX("tap");
+            if (_entered.Length < 4) _entered += d;
+            RenderDots();
+            if (_entered.Length == 4) PressConfirm();
+        }
+
+        private void PressBackspace()
+        {
+            if (_locked || _unlocked) return;
+            GameManager.Instance.Audio.PlaySFX("tap");
+            if (_entered.Length > 0)
+                _entered = _entered.Substring(0, _entered.Length - 1);
+            RenderDots();
+        }
+
+        private void PressConfirm()
+        {
+            if (_locked || _unlocked) return;
+            if (_entered.Length < 4) return;
+            if (_entered == (_profile.parentalPin ?? "0000"))
+            {
+                _unlocked = true;
+                GameManager.Instance.Audio.PlaySFX("correct");
+                StartCoroutine(SlideUpThenDestroy());
+            }
+            else
+            {
+                GameManager.Instance.Audio.PlaySFX("wrong");
+                _wrongAttempts++;
+                _entered = "";
+                RenderDots();
+                StartCoroutine(ShakeDots());
+                if (_wrongAttempts >= 3)
+                {
+                    StartCoroutine(LockoutFor(30));
+                }
+            }
+        }
+
+        private void RenderDots()
+        {
+            if (_dotImages == null) return;
+            for (int i = 0; i < _dotImages.Length; i++)
+            {
+                bool filled = i < _entered.Length;
+                _dotImages[i].color = filled
+                    ? UIFactory.Primary
+                    : new Color(0.6f, 0.6f, 0.6f, 0.4f);
+            }
+        }
+
+        private IEnumerator ShakeDots()
+        {
+            // Shake the dots row left/right for 0.4 seconds.
+            if (_dotImages == null || _dotImages.Length == 0) yield break;
+            var t = _dotImages[0].transform.parent as RectTransform;
+            if (t == null) yield break;
+            Vector2 start = t.anchoredPosition;
+            float dur = 0.4f, elapsed = 0;
+            while (elapsed < dur)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                t.anchoredPosition = start + new Vector2(Mathf.Sin(elapsed * 50) * 18, 0);
+                yield return null;
+            }
+            t.anchoredPosition = start;
+        }
+
+        private IEnumerator LockoutFor(int seconds)
+        {
+            _locked = true;
+            foreach (var b in _keypadButtons) if (b != null) b.interactable = false;
+            int remaining = seconds;
+            while (remaining > 0 && _locked)
+            {
+                if (_lockoutLabel != null)
+                    _lockoutLabel.text = $"Try again in {remaining} s";
+                yield return new WaitForSecondsRealtime(1f);
+                remaining--;
+            }
+            if (_lockoutLabel != null) _lockoutLabel.text = "";
+            foreach (var b in _keypadButtons) if (b != null) b.interactable = true;
+            _locked = false;
+            _wrongAttempts = 0;
+        }
+
+        private IEnumerator SlideUpThenDestroy()
+        {
+            const float dur = 0.4f;
+            const float dist = 1600f; // covers any portrait screen
+            float elapsed = 0;
+            Vector2 origMin = _gatePanel.anchorMin;
+            Vector2 origMax = _gatePanel.anchorMax;
+            while (elapsed < dur)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float k = Mathf.Clamp01(elapsed / dur);
+                // Easing out cubic
+                float e = 1f - Mathf.Pow(1f - k, 3f);
+                _gatePanel.anchoredPosition = new Vector2(0, dist * e);
+                yield return null;
+            }
+            var canvas = _gatePanel.GetComponentInParent<Canvas>();
+            if (canvas != null) Destroy(canvas.gameObject);
         }
 
         // -------------------------------------------------------------------
-        // Dashboard
+        // Dashboard (built underneath the gate, visible after the slide-up)
         // -------------------------------------------------------------------
         private void BuildDashboard()
         {
@@ -132,7 +311,11 @@ namespace MathEdu.Managers
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
             brt.sizeDelta = new Vector2(110, 110);
-            back.onClick.AddListener(() => GameManager.Instance.UI.Go(UIManager.SceneMainMenu));
+            back.onClick.AddListener(() =>
+            {
+                GameManager.Instance.Audio.PlaySFX("tap");
+                GameManager.Instance.UI.Go(UIManager.SceneMainMenu);
+            });
 
             // Scrollable body
             var scroll = UIFactory.CreateScrollView(safe, "DashScroll");
@@ -141,19 +324,13 @@ namespace MathEdu.Managers
             srt.offsetMin = new Vector2(16, 0); srt.offsetMax = new Vector2(-16, 0);
             var content = scroll.content;
 
-            // ----- Summary card -----
             BuildSummaryCard(content);
-
-            // ----- Per-subject accuracy chart -----
             BuildAccuracyCard(content);
-
-            // ----- Per-subject detail table -----
             BuildSubjectTable(content);
-
-            // ----- Per-grade completion -----
+            BuildBadgeWall(content);
             BuildGradeCompletion(content);
 
-            // Footer (change PIN)
+            // Footer (change PIN + reset progress)
             var footer = new GameObject("FooterRow",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             footer.transform.SetParent(content, false);
@@ -165,7 +342,7 @@ namespace MathEdu.Managers
 
             var pinBtn = UIFactory.CreateButton((RectTransform)footer.transform,
                 "Change PIN", UIFactory.Primary, 32, "PinBtn");
-            pinBtn.onClick.AddListener(ChangePin);
+            pinBtn.onClick.AddListener(ChangePinFromDashboard);
 
             var resetBtn = UIFactory.CreateButton((RectTransform)footer.transform,
                 "Reset Progress", UIFactory.Danger, 32, "ResetBtn");
@@ -227,7 +404,6 @@ namespace MathEdu.Managers
             }
             if (rows.Count == 0)
             {
-                // Empty state
                 var card = UIFactory.CreatePanel(parent, Vector2.zero, Vector2.one,
                     new Color(1, 1, 1, 0.10f), 24, "EmptyAccuracy");
                 var le = card.gameObject.AddComponent<LayoutElement>();
@@ -321,6 +497,46 @@ namespace MathEdu.Managers
                     Color.white, TextAlignmentOptions.Center, "Cell");
         }
 
+        private void BuildBadgeWall(RectTransform parent)
+        {
+            var holder = UIFactory.CreatePanel(parent, Vector2.zero, Vector2.one,
+                new Color(1, 1, 1, 0.10f), 24, "BadgeHolder");
+            var le = holder.gameObject.AddComponent<LayoutElement>();
+            le.preferredHeight = 360; le.minHeight = 240;
+
+            var col = UIFactory.CreateVerticalLayout(holder, 10,
+                new RectOffset(20, 20, 20, 20), "BadgeCol");
+            var crt = (RectTransform)col.transform;
+            crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
+            crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
+
+            UIFactory.CreateText((RectTransform)col.transform, "Badges", 40,
+                Color.white, TextAlignmentOptions.Left, "Title").fontStyle = FontStyles.Bold;
+
+            if (_profile.badges == null || _profile.badges.Count == 0)
+            {
+                UIFactory.CreateText((RectTransform)col.transform,
+                    "No badges yet — earn one by clearing a level!",
+                    26, Color.white, TextAlignmentOptions.Center, "Empty");
+                return;
+            }
+            var grid = new GameObject("BadgeGrid",
+                typeof(RectTransform), typeof(GridLayoutGroup), typeof(LayoutElement));
+            grid.transform.SetParent(col.transform, false);
+            var g = grid.GetComponent<GridLayoutGroup>();
+            g.cellSize = new Vector2(360, 70);
+            g.spacing  = new Vector2(8, 8);
+            g.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            g.constraintCount = 2;
+            grid.GetComponent<LayoutElement>().preferredHeight = 260;
+            foreach (var id in _profile.badges)
+            {
+                UIFactory.CreateText((RectTransform)grid.transform,
+                    ProgressManager.PrettyBadgeName(id), 28,
+                    Color.white, TextAlignmentOptions.MidlineLeft, "B_" + id);
+            }
+        }
+
         private void BuildGradeCompletion(RectTransform parent)
         {
             var holder = UIFactory.CreatePanel(parent, Vector2.zero, Vector2.one,
@@ -408,7 +624,7 @@ namespace MathEdu.Managers
             };
         }
 
-        private void ChangePin()
+        private void ChangePinFromDashboard()
         {
             PasswordDialog.Show(
                 "New Parental PIN",
@@ -417,12 +633,12 @@ namespace MathEdu.Managers
                 {
                     if (string.IsNullOrEmpty(pin) || pin.Length < 4)
                     {
-                        Debug.Log("[Parental] PIN too short.");
+                        GameManager.Instance.Audio.PlaySFX("wrong");
                         return;
                     }
                     _profile.parentalPin = pin;
                     GameManager.Instance.SaveProfile();
-                    GameManager.Instance.Audio.PlayCorrect();
+                    GameManager.Instance.Audio.PlaySFX("correct");
                 });
         }
 
