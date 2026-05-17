@@ -8,8 +8,9 @@
 //     [SceneBuilder] GameObject with the appropriate manager script.
 //   - Safe-area-aware containers out of the box.
 //
-// When real sprite assets are dropped in, the static "DefaultSprite" methods
-// are the single place to swap in the new artwork.
+// When real sprite assets are dropped in, the helpers automatically pull the
+// matching sprite off the optional UITheme asset (via UIThemeService); a
+// procedural placeholder from DefaultSprite is used as the fallback.
 // -----------------------------------------------------------------------------
 
 using TMPro;
@@ -22,18 +23,24 @@ namespace MathEdu.UI
     public static class UIFactory
     {
         // -------------------------------------------------------------------
-        // Color palette (designer-tunable)
+        // Color palette (designer-tunable; UITheme can override)
         // -------------------------------------------------------------------
-        public static readonly Color BgTop     = new Color(0.20f, 0.30f, 0.55f);
-        public static readonly Color BgBottom  = new Color(0.40f, 0.55f, 0.90f);
+        public static Color BgTop     => Themed(c => c.bgTop,    new Color(0.20f, 0.30f, 0.55f));
+        public static Color BgBottom  => Themed(c => c.bgBottom, new Color(0.40f, 0.55f, 0.90f));
         public static readonly Color Panel     = new Color(1.00f, 1.00f, 1.00f, 0.95f);
         public static readonly Color Card      = new Color(1.00f, 1.00f, 1.00f, 1.00f);
-        public static readonly Color Accent    = new Color(0.95f, 0.55f, 0.20f);
-        public static readonly Color Primary   = new Color(0.30f, 0.65f, 0.95f);
-        public static readonly Color Success   = new Color(0.30f, 0.80f, 0.40f);
-        public static readonly Color Danger    = new Color(0.95f, 0.40f, 0.40f);
+        public static Color Accent    => Themed(c => c.accent,   new Color(0.95f, 0.55f, 0.20f));
+        public static Color Primary   => Themed(c => c.primary,  new Color(0.30f, 0.65f, 0.95f));
+        public static Color Success   => Themed(c => c.success,  new Color(0.30f, 0.80f, 0.40f));
+        public static Color Danger    => Themed(c => c.danger,   new Color(0.95f, 0.40f, 0.40f));
         public static readonly Color TextDark  = new Color(0.10f, 0.15f, 0.25f);
         public static readonly Color TextLight = Color.white;
+
+        private static Color Themed(System.Func<MathEdu.Data.UITheme, Color> get, Color def)
+        {
+            var t = UIThemeService.Theme;
+            return (t != null && t.overrideColours) ? get(t) : def;
+        }
 
         // -------------------------------------------------------------------
         // Root canvas with EventSystem and safe-area handling
@@ -81,6 +88,7 @@ namespace MathEdu.UI
             var img = go.GetComponent<Image>();
             img.color  = Color.white;
             img.sprite = DefaultSprite.Gradient(top, bottom);
+            img.raycastTarget = false;
             return img;
         }
 
@@ -93,7 +101,33 @@ namespace MathEdu.UI
             var img = go.GetComponent<Image>();
             img.color = c;
             img.sprite = DefaultSprite.Solid();
+            img.raycastTarget = false;
             return img;
+        }
+
+        /// <summary>
+        /// Creates a background using a Sprite from the UITheme (key like
+        /// "menu", "play", "settings", "parental", "setup", "results"). Falls
+        /// back to a gradient if the theme has no sprite for that key.
+        /// </summary>
+        public static Image CreateThemedBackground(RectTransform parent, string key)
+        {
+            var sprite = UIThemeService.BackgroundFor(key);
+            if (sprite != null)
+            {
+                var go = new GameObject("Background", typeof(Image));
+                go.transform.SetParent(parent, false);
+                var rt = go.GetComponent<RectTransform>();
+                Stretch(rt);
+                var img = go.GetComponent<Image>();
+                img.color  = Color.white;
+                img.sprite = sprite;
+                img.type   = Image.Type.Simple;
+                img.raycastTarget  = false;
+                // Stretch to fill — children manage their own safe areas.
+                return img;
+            }
+            return CreateGradientBackground(parent, BgTop, BgBottom);
         }
 
         // -------------------------------------------------------------------
@@ -112,7 +146,9 @@ namespace MathEdu.UI
 
             var img = go.GetComponent<Image>();
             img.color  = color;
-            img.sprite = DefaultSprite.RoundedRect((int)cornerRadius);
+            img.sprite = UIThemeService.PanelSprite() != null
+                ? UIThemeService.PanelSprite()
+                : DefaultSprite.RoundedRect((int)cornerRadius);
             img.type   = Image.Type.Sliced;
             return rt;
         }
@@ -161,7 +197,7 @@ namespace MathEdu.UI
 
             var img = go.GetComponent<Image>();
             img.color  = bg ?? Primary;
-            img.sprite = DefaultSprite.RoundedRect(24);
+            img.sprite = UIThemeService.ButtonSprite();
             img.type   = Image.Type.Sliced;
 
             var btn = go.GetComponent<Button>();
@@ -184,6 +220,126 @@ namespace MathEdu.UI
             var btn = CreateButton(parent, icon, bg, 60, name);
             ((RectTransform)btn.transform).sizeDelta = new Vector2(140, 140);
             return btn;
+        }
+
+        // -------------------------------------------------------------------
+        // Inputs
+        // -------------------------------------------------------------------
+
+        /// <summary>
+        /// Build a TextMeshPro InputField. Returns the InputField so the caller
+        /// can hook onValueChanged / onSubmit.
+        /// </summary>
+        public static TMP_InputField CreateInputField(RectTransform parent, string placeholder,
+            int fontSize = 44, string name = "Input")
+        {
+            var go = new GameObject(name, typeof(Image), typeof(TMP_InputField));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(640, 140);
+
+            var img = go.GetComponent<Image>();
+            img.color  = Color.white;
+            img.sprite = UIThemeService.PanelSprite() != null
+                ? UIThemeService.PanelSprite()
+                : DefaultSprite.RoundedRect(20);
+            img.type = Image.Type.Sliced;
+
+            var input = go.GetComponent<TMP_InputField>();
+
+            // Text area
+            var textArea = new GameObject("TextArea", typeof(RectTransform), typeof(RectMask2D));
+            textArea.transform.SetParent(rt, false);
+            var tar = (RectTransform)textArea.transform;
+            tar.anchorMin = Vector2.zero; tar.anchorMax = Vector2.one;
+            tar.offsetMin = new Vector2(24, 12);
+            tar.offsetMax = new Vector2(-24, -12);
+
+            var placeholderTxt = CreateText(tar, placeholder, fontSize,
+                new Color(0.4f, 0.4f, 0.5f), TextAlignmentOptions.MidlineLeft, "Placeholder");
+            placeholderTxt.fontStyle = FontStyles.Italic;
+
+            var contentTxt = CreateText(tar, "", fontSize,
+                TextDark, TextAlignmentOptions.MidlineLeft, "Content");
+
+            input.textViewport = tar;
+            input.textComponent = contentTxt;
+            input.placeholder   = placeholderTxt;
+            input.fontAsset     = contentTxt.font;
+            input.characterLimit = 24;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            return input;
+        }
+
+        /// <summary>
+        /// Build a horizontal slider (0..1) with sprite-aware background, fill,
+        /// and handle. Returns the Slider component.
+        /// </summary>
+        public static Slider CreateSlider(RectTransform parent, float initialValue = 0.5f,
+            string name = "Slider")
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(Slider));
+            go.transform.SetParent(parent, false);
+            var rt = (RectTransform)go.transform;
+            rt.sizeDelta = new Vector2(560, 60);
+
+            var slider = go.GetComponent<Slider>();
+            slider.direction = Slider.Direction.LeftToRight;
+            slider.minValue  = 0f;
+            slider.maxValue  = 1f;
+            slider.wholeNumbers = false;
+
+            // Background
+            var bg = new GameObject("Background", typeof(Image));
+            bg.transform.SetParent(rt, false);
+            var bgRt = (RectTransform)bg.transform;
+            bgRt.anchorMin = new Vector2(0, 0.25f);
+            bgRt.anchorMax = new Vector2(1, 0.75f);
+            bgRt.offsetMin = Vector2.zero; bgRt.offsetMax = Vector2.zero;
+            var bgImg = bg.GetComponent<Image>();
+            bgImg.color = new Color(0.2f, 0.25f, 0.35f, 0.6f);
+            bgImg.sprite = UIThemeService.SliderBg();
+            bgImg.type   = Image.Type.Sliced;
+
+            // Fill area & fill
+            var fillArea = new GameObject("FillArea", typeof(RectTransform));
+            fillArea.transform.SetParent(rt, false);
+            var faRt = (RectTransform)fillArea.transform;
+            faRt.anchorMin = new Vector2(0, 0.25f);
+            faRt.anchorMax = new Vector2(1, 0.75f);
+            faRt.offsetMin = new Vector2(10, 0);
+            faRt.offsetMax = new Vector2(-10, 0);
+
+            var fill = new GameObject("Fill", typeof(Image));
+            fill.transform.SetParent(faRt, false);
+            var fillRt = (RectTransform)fill.transform;
+            fillRt.anchorMin = Vector2.zero; fillRt.anchorMax = Vector2.one;
+            fillRt.offsetMin = Vector2.zero; fillRt.offsetMax = Vector2.zero;
+            var fillImg = fill.GetComponent<Image>();
+            fillImg.color  = Primary;
+            fillImg.sprite = UIThemeService.SliderFill();
+            fillImg.type   = Image.Type.Sliced;
+
+            // Handle slide area
+            var handleArea = new GameObject("HandleSlideArea", typeof(RectTransform));
+            handleArea.transform.SetParent(rt, false);
+            var haRt = (RectTransform)handleArea.transform;
+            haRt.anchorMin = Vector2.zero; haRt.anchorMax = Vector2.one;
+            haRt.offsetMin = new Vector2(20, 0); haRt.offsetMax = new Vector2(-20, 0);
+
+            var handle = new GameObject("Handle", typeof(Image));
+            handle.transform.SetParent(haRt, false);
+            var hRt = (RectTransform)handle.transform;
+            hRt.sizeDelta = new Vector2(56, 56);
+            var hImg = handle.GetComponent<Image>();
+            hImg.color  = Color.white;
+            hImg.sprite = UIThemeService.SliderHandle();
+
+            slider.fillRect       = fillRt;
+            slider.handleRect     = hRt;
+            slider.targetGraphic  = hImg;
+            slider.value          = Mathf.Clamp01(initialValue);
+            return slider;
         }
 
         // -------------------------------------------------------------------
