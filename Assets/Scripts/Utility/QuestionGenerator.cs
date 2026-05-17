@@ -22,7 +22,9 @@
 //            Money (making change).
 //
 // Each (grade, subject, level) yields a fixed-size question list whose
-// difficulty escalates with the level number.
+// difficulty escalates with the level number. We now ship 20 levels per
+// subject (per Learning Mode), with the difficulty curve rebalanced so the
+// final levels remain challenging but still solvable.
 // -----------------------------------------------------------------------------
 
 using System;
@@ -38,7 +40,7 @@ namespace MathEdu.Utility
         // Public API
         // -------------------------------------------------------------------
 
-        public const int LevelsPerSubject     = 10;
+        public const int LevelsPerSubject     = 20;
         public const int QuestionsPerLevel    = 10;
 
         /// <summary>
@@ -194,24 +196,29 @@ namespace MathEdu.Utility
         }
 
         // -------------------------------------------------------------------
-        // Generators -- one per subject
+        // Generators -- one per subject (all rescaled to support up to 20 levels)
         // -------------------------------------------------------------------
 
         private static List<MathQuestion> Counting(int grade, int level, System.Random rng)
         {
-            int max = grade == 1 ? Mathf.Min(20, 5 + level * 2)
-                                  : Mathf.Min(120, 20 + level * 10);
-            int skip = grade == 1 ? 1 : (level <= 3 ? 2 : (level <= 7 ? 5 : 10));
+            // Grade 1: count 1..N where N grows from 8 → 30 across 20 levels.
+            // Grade 2/3: skip-counting by 2/5/10/25 with growing max.
+            int max = grade == 1
+                ? Mathf.Min(30, 6 + level)
+                : Mathf.Min(300, 20 + level * 14);
+            int skip = grade == 1
+                ? 1
+                : (level <= 6 ? 2 : level <= 12 ? 5 : level <= 16 ? 10 : 25);
 
             var list = new List<MathQuestion>(QuestionsPerLevel);
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
-                int start  = rng.Next(0, max - skip * 3);
+                int start  = rng.Next(0, Math.Max(1, max - skip * 3));
                 int answer = start + skip * 3;
                 var q = new MathQuestion
                 {
                     prompt      = $"What comes next?\n{start}, {start + skip}, {start + skip * 2}, ?",
-                    options     = ShuffleAround(answer, skip, rng),
+                    options     = ShuffleAround(answer, Mathf.Max(1, skip), rng),
                     hint        = $"Skip-count by {skip}.",
                     explanation = $"Each step adds {skip}.",
                     difficulty  = ScaleDifficulty(level),
@@ -225,7 +232,13 @@ namespace MathEdu.Utility
 
         private static List<MathQuestion> Addition(int grade, int level, System.Random rng)
         {
-            int max = grade switch { 1 => 10 + level, 2 => 20 + level * 8, _ => 200 + level * 80 };
+            // Operand ceiling escalates per level — 20 levels supported.
+            int max = grade switch
+            {
+                1 => 4 + level,            // L1: 5..  L20: 24
+                2 => 10 + level * 5,       // L1: 15.. L20: 110
+                _ => 100 + level * 50      // L1: 150.. L20: 1100
+            };
             var list = new List<MathQuestion>(QuestionsPerLevel);
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
@@ -239,7 +252,7 @@ namespace MathEdu.Utility
                     hint        = $"Start at {Math.Max(a, b)} and count up by {Math.Min(a, b)}.",
                     explanation = $"{a} + {b} = {ans}.",
                     difficulty  = ScaleDifficulty(level),
-                    visual      = grade == 1 && level <= 3 ? QuestionVisual.Dots : QuestionVisual.TextOnly,
+                    visual      = grade == 1 && level <= 5 ? QuestionVisual.Dots : QuestionVisual.TextOnly,
                     visualPayload = grade == 1 ? new[] { a, b } : Array.Empty<int>()
                 };
                 q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -250,7 +263,12 @@ namespace MathEdu.Utility
 
         private static List<MathQuestion> Subtraction(int grade, int level, System.Random rng)
         {
-            int max = grade switch { 1 => 10 + level, 2 => 20 + level * 8, _ => 200 + level * 80 };
+            int max = grade switch
+            {
+                1 => 4 + level,
+                2 => 10 + level * 5,
+                _ => 100 + level * 50
+            };
             var list = new List<MathQuestion>(QuestionsPerLevel);
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
@@ -264,7 +282,7 @@ namespace MathEdu.Utility
                     hint        = $"Count back {b} from {a}.",
                     explanation = $"{a} - {b} = {ans}.",
                     difficulty  = ScaleDifficulty(level),
-                    visual      = grade == 1 && level <= 3 ? QuestionVisual.Dots : QuestionVisual.TextOnly,
+                    visual      = grade == 1 && level <= 5 ? QuestionVisual.Dots : QuestionVisual.TextOnly,
                     visualPayload = grade == 1 ? new[] { a, b } : Array.Empty<int>()
                 };
                 q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -275,16 +293,19 @@ namespace MathEdu.Utility
 
         private static List<MathQuestion> Multiplication(int grade, int level, System.Random rng)
         {
-            int maxFactor = grade == 2 ? Math.Min(10, 2 + level) : 12;
-            int floor     = grade == 2 ? 2                       : 1;
-            // Grade 2 levels lock to the friendly tables 2 / 5 / 10 then expand.
+            int maxFactor = grade == 2
+                ? Math.Min(10, 2 + level / 2) // Grade 2 grows more slowly
+                : 12;
+            int floor = grade == 2 ? 2 : 1;
+            // Grade 2 cycles through friendly tables before mixing them up.
             int[] grade2Tables = { 2, 5, 10, 3, 4, 1, 6, 7, 8, 9 };
 
             var list = new List<MathQuestion>(QuestionsPerLevel);
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
-                int a = grade == 2 ? grade2Tables[(level - 1) % grade2Tables.Length]
-                                   : rng.Next(floor, maxFactor + 1);
+                int a = grade == 2
+                    ? grade2Tables[(level - 1) % grade2Tables.Length]
+                    : rng.Next(floor, maxFactor + 1);
                 int b = rng.Next(floor, maxFactor + 1);
                 int ans = a * b;
                 var q = new MathQuestion
@@ -303,7 +324,7 @@ namespace MathEdu.Utility
 
         private static List<MathQuestion> Division(int grade, int level, System.Random rng)
         {
-            int maxFactor = Math.Min(10, 2 + level);
+            int maxFactor = Math.Min(12, 2 + level / 2);
             var list = new List<MathQuestion>(QuestionsPerLevel);
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
@@ -326,7 +347,8 @@ namespace MathEdu.Utility
 
         private static List<MathQuestion> Shapes(int grade, int level, System.Random rng)
         {
-            // Grade 1: name 2-D shapes; Grade 2: include 3-D; Grade 3: perimeter / area.
+            // Grade 1: name 2-D shapes; Grade 2 (after L8): include 3-D;
+            // Grade 3: perimeter / area / properties.
             string[] shapes2D = { "Triangle", "Square", "Rectangle", "Circle", "Pentagon", "Hexagon", "Octagon" };
             int[]    sides    = { 3,           4,        4,           0,        5,           6,         8        };
             string[] shapes3D = { "Cube", "Sphere", "Cylinder", "Cone", "Pyramid" };
@@ -338,8 +360,10 @@ namespace MathEdu.Utility
 
                 if (grade == 3)
                 {
-                    int w = rng.Next(2, 12);
-                    int h = rng.Next(2, 12);
+                    // Higher levels = larger rectangles.
+                    int spread = 2 + level;
+                    int w = rng.Next(2, 2 + spread);
+                    int h = rng.Next(2, 2 + spread);
                     bool perimeter = (i % 2 == 0);
                     int ans = perimeter ? 2 * (w + h) : w * h;
                     q = new MathQuestion
@@ -358,7 +382,7 @@ namespace MathEdu.Utility
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
-                else if (grade == 2 && level > 5)
+                else if (grade == 2 && level > 10)
                 {
                     int idx = rng.Next(shapes3D.Length);
                     string answer = shapes3D[idx];
@@ -445,13 +469,14 @@ namespace MathEdu.Utility
         private static List<MathQuestion> Patterns(int grade, int level, System.Random rng)
         {
             var list = new List<MathQuestion>(QuestionsPerLevel);
-            string[] tokens = { "A", "B", "C", "Star", "Circle", "Square" };
+            string[] tokens = { "A", "B", "C", "Star", "Circle", "Square", "Heart" };
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
-                int patternLen = 2 + (level / 4); // 2, 3, then 4
+                int patternLen = Math.Min(4, 2 + (level / 6)); // 2 → 3 → 4 across 20 levels
                 var pattern = new string[patternLen];
+                int paletteSize = Math.Min(tokens.Length, 3 + level / 4);
                 for (int j = 0; j < patternLen; j++)
-                    pattern[j] = tokens[rng.Next(Math.Min(3 + level / 3, tokens.Length))];
+                    pattern[j] = tokens[rng.Next(paletteSize)];
                 // Build a sequence of 5 items
                 var seq = new List<string>();
                 for (int j = 0; j < 5; j++) seq.Add(pattern[j % patternLen]);
@@ -481,34 +506,40 @@ namespace MathEdu.Utility
         private static List<MathQuestion> Fractions(int grade, int level, System.Random rng)
         {
             var list = new List<MathQuestion>(QuestionsPerLevel);
-            // Grade 2: identify halves/thirds/quarters. Grade 3: equivalent fractions, compare.
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
                 MathQuestion q;
                 if (grade == 2)
                 {
-                    int den = rng.Next(2, 5); // 2, 3, 4
-                    int num = 1;              // unit fractions are easiest
+                    // Grade 2: identify halves/thirds/quarters/fifths/sixths.
+                    int den = rng.Next(2, Math.Min(7, 3 + level / 4));
+                    int num = 1;
                     string label = $"{num}/{den}";
-                    string[] opts = { "1/2", "1/3", "1/4", "1/5" };
+                    string[] opts = { "1/2", "1/3", "1/4", "1/5", "1/6" };
+                    // Pick four including label.
+                    var pool = new List<string>(opts);
+                    pool.Remove(label);
+                    Shuffle(pool, rng);
+                    var picks = new[] { label, pool[0], pool[1], pool[2] };
+                    Shuffle(picks, rng);
                     q = new MathQuestion
                     {
                         prompt      = $"Which fraction means ONE of {den} equal parts?",
-                        options     = opts,
+                        options     = picks,
                         hint        = "Look at the bottom number.",
                         explanation = $"One of {den} equal parts is written {label}.",
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Fraction,
                         visualPayload = new[] { num, den }
                     };
-                    q.correctIndex = IndexOf(opts, label);
+                    q.correctIndex = IndexOf(picks, label);
                 }
                 else
                 {
-                    // Grade 3: equivalent fractions
-                    int den = rng.Next(2, 6);
+                    // Grade 3: equivalent fractions.
+                    int den = rng.Next(2, Math.Min(10, 3 + level / 3));
                     int num = rng.Next(1, den);
-                    int factor = rng.Next(2, 4);
+                    int factor = rng.Next(2, 5);
                     int eqNum = num * factor;
                     int eqDen = den * factor;
                     string answer = $"{eqNum}/{eqDen}";
@@ -545,7 +576,7 @@ namespace MathEdu.Utility
             {
                 "pencil", "tree", "book", "spoon of sugar", "bag of rice",
                 "glass of water", "bottle of juice", "ant", "elephant",
-                "desk", "house", "car"
+                "desk", "house", "car", "school bus", "phone"
             };
 
             for (int i = 0; i < QuestionsPerLevel; i++)
@@ -553,17 +584,11 @@ namespace MathEdu.Utility
                 MathQuestion q;
                 if (grade == 1)
                 {
-                    // compare lengths
-                    string a = "pencil";
-                    string b = "school bus";
-                    bool aLonger = rng.Next(2) == 0;
-                    string longer = aLonger ? a : b;
-                    string shorter = aLonger ? b : a;
-                    // Actually pick two real items with clear ordering
                     var pairs = new (string s, string l)[]
                     {
                         ("ant", "cat"), ("pencil", "ruler"), ("spoon", "broom"),
-                        ("book", "desk"), ("cup", "bottle"), ("phone", "tv")
+                        ("book", "desk"), ("cup", "bottle"), ("phone", "tv"),
+                        ("crayon", "yard stick"), ("mouse", "horse")
                     };
                     var pair = pairs[rng.Next(pairs.Length)];
                     q = new MathQuestion
@@ -594,6 +619,8 @@ namespace MathEdu.Utility
                         "desk"             => "m",
                         "house"            => "m",
                         "car"              => "m",
+                        "school bus"       => "m",
+                        "phone"            => "cm",
                         _ => "cm"
                     };
                     var others = new List<string>(units);
@@ -622,16 +649,26 @@ namespace MathEdu.Utility
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
                 int hour = rng.Next(1, 13);
-                int minute = grade == 1 ? 0
-                           : grade == 2 ? rng.Next(0, 12) * 5
+                int minute;
+                if (grade == 1) minute = 0;
+                else if (grade == 2)
+                {
+                    // Grade 2 progresses from quarter-hours → 5-min → odd intervals.
+                    minute = level <= 8 ? rng.Next(0, 4) * 15
+                           : level <= 16 ? rng.Next(0, 12) * 5
                                         : rng.Next(0, 60);
+                }
+                else
+                {
+                    minute = level <= 6 ? rng.Next(0, 12) * 5 : rng.Next(0, 60);
+                }
 
                 string answer = $"{hour:0}:{minute:00}";
                 var opts = new List<string> { answer };
                 while (opts.Count < 4)
                 {
                     int h = rng.Next(1, 13);
-                    int m = grade == 1 ? 0 : grade == 2 ? rng.Next(0, 12) * 5 : rng.Next(0, 60);
+                    int m = grade == 1 ? 0 : rng.Next(0, 60);
                     string c = $"{h:0}:{m:00}";
                     if (!opts.Contains(c)) opts.Add(c);
                 }
@@ -694,7 +731,7 @@ namespace MathEdu.Utility
                 }
                 else if (grade == 2)
                 {
-                    int n = 2 + rng.Next(3);
+                    int n = 2 + rng.Next(2 + level / 5); // more coins at higher levels
                     int total = 0;
                     var picks = new List<string>();
                     for (int k = 0; k < n; k++)
@@ -718,15 +755,16 @@ namespace MathEdu.Utility
                 else
                 {
                     int price = rng.Next(15, 95);
-                    int paid  = 100;
+                    int paid  = level <= 10 ? 100 : (rng.Next(2, 6) * 50); // 1$..2.50$
+                    if (paid <= price) paid = price + rng.Next(5, 50);
                     int change = paid - price;
                     var opts = ShuffleAround(change, 10, rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"You buy a snack for {price}c and pay with 1 dollar. What is your change?",
+                        prompt      = $"You buy a snack for {price}c and pay {paid}c. What is your change?",
                         options     = AppendCents(opts),
-                        hint        = "Change = 100 - price.",
-                        explanation = $"100 - {price} = {change} cents.",
+                        hint        = $"Change = {paid} - price.",
+                        explanation = $"{paid} - {price} = {change} cents.",
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Money
                     };
@@ -743,15 +781,16 @@ namespace MathEdu.Utility
 
         private static QuestionDifficulty ScaleDifficulty(int level)
         {
-            if (level <= 2) return QuestionDifficulty.VeryEasy;
-            if (level <= 4) return QuestionDifficulty.Easy;
-            if (level <= 6) return QuestionDifficulty.Medium;
-            if (level <= 8) return QuestionDifficulty.Hard;
+            // 20-level curve.
+            if (level <=  4) return QuestionDifficulty.VeryEasy;
+            if (level <=  8) return QuestionDifficulty.Easy;
+            if (level <= 12) return QuestionDifficulty.Medium;
+            if (level <= 16) return QuestionDifficulty.Hard;
             return QuestionDifficulty.VeryHard;
         }
 
         private static int HashSeed(int g, MathSubject s, int l)
-            => g * 100000 + (int)s * 1000 + l;
+            => g * 1_000_000 + (int)s * 1_000 + l;
 
         /// <summary>
         /// Build a 4-option string array that includes the correct answer and
