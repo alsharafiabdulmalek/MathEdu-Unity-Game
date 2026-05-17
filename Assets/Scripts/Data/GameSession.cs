@@ -34,6 +34,9 @@ namespace MathEdu.Data
         public int   score;
         public float elapsedSeconds;
 
+        /// <summary>UTC time when the current play-session began.</summary>
+        public DateTime sessionStartedUtc = DateTime.UtcNow;
+
         public void ResetGameplay()
         {
             currentQuestionIndex = 0;
@@ -41,6 +44,7 @@ namespace MathEdu.Data
             wrongCount           = 0;
             score                = 0;
             elapsedSeconds       = 0f;
+            sessionStartedUtc    = DateTime.UtcNow;
         }
     }
 }
