@@ -5,13 +5,14 @@
 //   • Music ON/OFF toggle + volume slider
 //   • SFX ON/OFF toggle + volume slider
 //   • Haptics toggle
-//   • Language placeholder dropdown (English by default)
-//   • Reset progress button (PIN-gated)
+//   • Language placeholder (English by default)
+//   • Change Parental PIN (current → new → confirm flow)
+//   • Reset Player Progress (PIN-gated)
 //   • Back button → Main Menu
 //
 // All changes are written straight to PlayerProfile and flushed to JSON via
-// GameManager.SaveProfile. AudioManager picks up the new volumes via
-// ApplyVolumeFromProfile().
+// GameManager.SaveProfile *immediately* on every toggle/slider event, so the
+// player never has to back out to persist a setting.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -62,52 +63,61 @@ namespace MathEdu.Managers
             brt.sizeDelta = new Vector2(110, 110);
             back.onClick.AddListener(() =>
             {
-                GameManager.Instance.Audio.PlayTap();
+                GameManager.Instance.Audio.PlaySFX("tap");
                 GameManager.Instance.SaveProfile();
                 GameManager.Instance.UI.Go(UIManager.SceneMainMenu);
             });
 
-            // Body
-            var card = UIFactory.CreatePanel(safe,
-                new Vector2(0.05f, 0.10f), new Vector2(0.95f, 0.86f),
-                UIFactory.Card, 28, "Card");
+            // Body — scroll view so all rows fit on small phones
+            var scroll = UIFactory.CreateScrollView(safe, "SettingsScroll");
+            var srt = (RectTransform)scroll.transform;
+            srt.anchorMin = new Vector2(0.05f, 0.06f); srt.anchorMax = new Vector2(0.95f, 0.88f);
+            srt.offsetMin = Vector2.zero; srt.offsetMax = Vector2.zero;
 
-            var col = UIFactory.CreateVerticalLayout(card, 28,
-                new RectOffset(32, 32, 32, 32), "Col");
-            var crt = (RectTransform)col.transform;
-            crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
-            crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
+            var content = scroll.content;
 
             // ----- Music -----
-            BuildSection((RectTransform)col.transform, "🎵  Music",
+            BuildSection(content, "🎵  Music",
                 _profile.musicOn, _profile.musicVolume,
-                onToggle: v => { _profile.musicOn = v; ApplyVolumes(); },
-                onSlider: v => { _profile.musicVolume = v; ApplyVolumes(); },
+                onToggle: v => { _profile.musicOn = v; ApplyVolumes(); Save(); },
+                onSlider: v => { _profile.musicVolume = v; ApplyVolumes(); Save(); },
                 out _musicToggle, out _musicSlider);
 
             // ----- SFX -----
-            BuildSection((RectTransform)col.transform, "🔊  Sound Effects",
+            BuildSection(content, "🔊  Sound Effects",
                 _profile.sfxOn, _profile.sfxVolume,
-                onToggle: v => { _profile.sfxOn = v; ApplyVolumes(); GameManager.Instance.Audio.PlayTap(); },
-                onSlider: v => { _profile.sfxVolume = v; ApplyVolumes(); },
+                onToggle: v =>
+                {
+                    _profile.sfxOn = v;
+                    ApplyVolumes();
+                    Save();
+                    GameManager.Instance.Audio.PlaySFX("tap");
+                },
+                onSlider: v => { _profile.sfxVolume = v; ApplyVolumes(); Save(); },
                 out _sfxToggle, out _sfxSlider);
 
             // ----- Haptics -----
-            BuildToggleRow((RectTransform)col.transform, "📳  Haptics", _profile.hapticsOn,
-                v => _profile.hapticsOn = v, out _hapticsToggle);
+            BuildToggleRow(content, "📳  Haptics", _profile.hapticsOn,
+                v => { _profile.hapticsOn = v; Save(); }, out _hapticsToggle);
 
             // ----- Language placeholder -----
-            BuildLanguageRow((RectTransform)col.transform);
+            BuildLanguageRow(content);
+
+            // ----- Change PIN -----
+            var pinBtn = UIFactory.CreateButton(content,
+                "🔐  Change Parental PIN…", UIFactory.Primary, 36, "PinBtn");
+            pinBtn.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
+            pinBtn.onClick.AddListener(BeginChangePin);
 
             // ----- Reset Progress -----
-            var resetBtn = UIFactory.CreateButton((RectTransform)col.transform,
+            var resetBtn = UIFactory.CreateButton(content,
                 "Reset Player Progress…", UIFactory.Danger, 36, "ResetBtn");
             var rle = resetBtn.gameObject.AddComponent<LayoutElement>();
             rle.preferredHeight = 130; rle.minHeight = 100;
             resetBtn.onClick.AddListener(ConfirmReset);
 
             // About
-            var about = UIFactory.CreateText((RectTransform)col.transform,
+            var about = UIFactory.CreateText(content,
                 "MathEdu • Unity 6000.4.4f1 • Built for kids who love numbers.",
                 26, new Color(0.30f, 0.35f, 0.45f), TextAlignmentOptions.Center, "About");
             var ale = about.gameObject.AddComponent<LayoutElement>();
@@ -209,7 +219,7 @@ namespace MathEdu.Managers
             btn.onClick.AddListener(() =>
             {
                 // Placeholder — real i18n hooks would swap a TMP_FontAsset + dictionary.
-                GameManager.Instance.Audio.PlayTap();
+                GameManager.Instance.Audio.PlaySFX("tap");
             });
         }
 
@@ -218,13 +228,68 @@ namespace MathEdu.Managers
         // -------------------------------------------------------------------
         private void ApplyVolumes()
         {
-            // Toggles take precedence over slider values — flipping off the
-            // toggle drives volume to 0 even if the slider is high.
             float music = _profile.musicOn ? _profile.musicVolume : 0f;
             float sfx   = _profile.sfxOn   ? _profile.sfxVolume   : 0f;
             GameManager.Instance.Audio.SetMusicVolume(music);
             GameManager.Instance.Audio.SetSfxVolume(sfx);
-            GameManager.Instance.SaveProfile();
+        }
+
+        private void Save() => GameManager.Instance.SaveProfile();
+
+        // -------------------------------------------------------------------
+        // PIN change flow: current → new → confirm
+        // -------------------------------------------------------------------
+        private void BeginChangePin()
+        {
+            GameManager.Instance.Audio.PlaySFX("tap");
+            PasswordDialog.Show(
+                "Enter current PIN",
+                "Verify the parental PIN before changing it.",
+                onSubmit: current =>
+                {
+                    if (current != _profile.parentalPin)
+                    {
+                        GameManager.Instance.Audio.PlaySFX("wrong");
+                        return;
+                    }
+                    PromptNewPin();
+                });
+        }
+
+        private void PromptNewPin()
+        {
+            PasswordDialog.Show(
+                "New PIN",
+                "Pick a 4–8 digit PIN.",
+                onSubmit: newPin =>
+                {
+                    if (string.IsNullOrEmpty(newPin) || newPin.Length < 4)
+                    {
+                        GameManager.Instance.Audio.PlaySFX("wrong");
+                        return;
+                    }
+                    PromptConfirmPin(newPin);
+                });
+        }
+
+        private void PromptConfirmPin(string newPin)
+        {
+            PasswordDialog.Show(
+                "Confirm PIN",
+                "Type the new PIN again.",
+                onSubmit: confirm =>
+                {
+                    if (confirm == newPin)
+                    {
+                        _profile.parentalPin = newPin;
+                        Save();
+                        GameManager.Instance.Audio.PlaySFX("correct");
+                    }
+                    else
+                    {
+                        GameManager.Instance.Audio.PlaySFX("wrong");
+                    }
+                });
         }
 
         private void ConfirmReset()
@@ -241,7 +306,7 @@ namespace MathEdu.Managers
                     }
                     else
                     {
-                        Debug.Log("[Settings] Incorrect PIN.");
+                        GameManager.Instance.Audio.PlaySFX("wrong");
                     }
                 });
         }
