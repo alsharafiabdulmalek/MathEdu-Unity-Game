@@ -2,7 +2,8 @@
 // ResultsManager.cs
 // -----------------------------------------------------------------------------
 // End-of-level celebration screen. Animates an incremental star count from 0
-// to earned, shows the final score, and offers retry / next-level / menu CTAs.
+// to earned, shows the final score, fires a VFX burst per star, and offers
+// retry / next-level / menu CTAs.
 // -----------------------------------------------------------------------------
 
 using System.Collections;
@@ -25,7 +26,7 @@ namespace MathEdu.Modes
         private void Build()
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[ResultsCanvas]");
-            UIFactory.CreateGradientBackground(safe, UIFactory.BgTop, UIFactory.BgBottom);
+            UIFactory.CreateThemedBackground(safe, "results");
 
             var session = GameManager.Instance.Session;
             var level   = GameManager.Instance.CurrentLevel;
@@ -48,7 +49,7 @@ namespace MathEdu.Modes
                 .fontStyle = FontStyles.Bold;
 
             var stars3 = StarRating.Spawn((RectTransform)col.transform, 0, 120);
-            StartCoroutine(stars3.AnimateTo(stars));
+            StartCoroutine(AnimateStars(stars3, stars));
 
             UIFactory.CreateText((RectTransform)col.transform,
                 $"Correct: {session.correctCount}/{total}",
@@ -78,8 +79,27 @@ namespace MathEdu.Modes
                 UIFactory.Success, 40, "Next");
             nextBtn.onClick.AddListener(NextLevel);
 
-            if (stars > 0) GameManager.Instance.Audio.PlayWin();
-            else           GameManager.Instance.Audio.PlayLose();
+            // Audio + VFX celebration
+            if (stars > 0)
+            {
+                GameManager.Instance.Audio.PlayWin();
+                GameManager.Instance.VFX?.PlayWin();
+            }
+            else
+            {
+                GameManager.Instance.Audio.PlayLose();
+                GameManager.Instance.VFX?.PlayLose();
+            }
+        }
+
+        private IEnumerator AnimateStars(StarRating widget, int stars)
+        {
+            for (int i = 0; i <= stars; i++)
+            {
+                widget.SetStars(i);
+                if (i > 0) GameManager.Instance.VFX?.PlayStar();
+                yield return new WaitForSeconds(0.35f);
+            }
         }
 
         private string SceneForMode()
