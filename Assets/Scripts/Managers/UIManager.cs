@@ -18,16 +18,19 @@ namespace MathEdu.Managers
     {
         // Canonical scene names. Keep in sync with the .unity files in
         // Assets/Scenes/ and with EditorBuildSettings.scenes.
-        public const string SceneBootstrap   = "Bootstrap";
-        public const string SceneMainMenu    = "MainMenu";
-        public const string SceneLevelSelect = "LevelSelect";
-        public const string SceneModeSelect  = "ModeSelect";
-        public const string SceneLearn       = "LearnMode";
-        public const string ScenePractice    = "PracticeMode";
-        public const string SceneQuiz        = "QuizMode";
-        public const string SceneStory       = "StoryMode";
-        public const string SceneSpeed       = "SpeedRound";
-        public const string SceneResults     = "Results";
+        public const string SceneBootstrap        = "Bootstrap";
+        public const string ScenePlayerSetup      = "PlayerSetup";
+        public const string SceneMainMenu         = "MainMenu";
+        public const string SceneLevelSelect      = "LevelSelect";
+        public const string SceneModeSelect       = "ModeSelect";
+        public const string SceneLearn            = "LearnMode";
+        public const string ScenePractice         = "PracticeMode";
+        public const string SceneQuiz             = "QuizMode";
+        public const string SceneStory            = "StoryMode";
+        public const string SceneSpeed            = "SpeedRound";
+        public const string SceneResults          = "Results";
+        public const string SceneSettings         = "Settings";
+        public const string SceneParentalDashboard = "ParentalDashboard";
 
         public bool transitionInFlight { get; private set; }
 
@@ -50,6 +53,7 @@ namespace MathEdu.Managers
                 transitionInFlight = false;
                 yield break;
             }
+
             while (!op.isDone) yield return null;
 
             yield return fader.FadeTo(0f, fade);
