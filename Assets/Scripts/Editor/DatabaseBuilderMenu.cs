@@ -9,6 +9,7 @@
 //   MathEdu / Build Default Database          → generate or update all assets
 //   MathEdu / Wipe Generated Database         → delete the generated tree
 //   MathEdu / Reset Player Progress           → wipe save file + PlayerPrefs
+//   MathEdu / Build Default Avatar Library    → 10 emoji avatars under SO/Avatars
 // -----------------------------------------------------------------------------
 
 #if UNITY_EDITOR
@@ -97,12 +98,12 @@ namespace MathEdu.EditorTools
                         ld.storyIntro    = $"A new chapter for Level {lvl}!";
                         ld.storyOutro    = "Great work! The story continues…";
                         ld.questions     = QuestionGenerator.Generate(gradeNum, subj, lvl);
-                        ld.quizSecondsPerQuestion  = Mathf.Lerp(25f, 12f, lvl / 10f);
-                        ld.speedSecondsPerQuestion = Mathf.Lerp(7f,  3f,  lvl / 10f);
-                        ld.xpReward = 25 + lvl * 5;
+                        ld.quizSecondsPerQuestion  = DatabaseBootstrapper.TimerForQuiz(lvl);
+                        ld.speedSecondsPerQuestion = DatabaseBootstrapper.TimerForSpeed(lvl);
+                        ld.xpReward = 20 + lvl * 5;
                         ld.badgeId  = lvl == QuestionGenerator.LevelsPerSubject
                             ? $"master_{subj}_{gradeNum}".ToLowerInvariant()
-                            : "";
+                            : (lvl == 10 ? $"halfway_{subj}_{gradeNum}".ToLowerInvariant() : "");
                         EditorUtility.SetDirty(ld);
                         s.levels.Add(ld);
                     }
@@ -129,7 +130,67 @@ namespace MathEdu.EditorTools
 
             Debug.Log($"[MathEdu] Database built. Total questions: {db.TotalQuestionCount}");
             EditorUtility.DisplayDialog("MathEdu",
-                $"Math database built.\n\nGrades: {db.grades.Count}\nQuestions: {db.TotalQuestionCount}",
+                $"Math database built.\n\nGrades: {db.grades.Count}\nLevels/subject: {QuestionGenerator.LevelsPerSubject}\nQuestions: {db.TotalQuestionCount}",
+                "OK");
+        }
+
+        [MenuItem("MathEdu/Build Default Avatar Library", priority = 12)]
+        public static void BuildAvatars()
+        {
+            EnsureFolder(Root);
+            EnsureFolder($"{Root}/Avatars");
+            EnsureFolder("Assets/Resources");
+
+            string libPath = $"{Root}/AvatarLibrary.asset";
+            var lib = AssetDatabase.LoadAssetAtPath<AvatarLibrary>(libPath);
+            if (lib == null)
+            {
+                lib = ScriptableObject.CreateInstance<AvatarLibrary>();
+                AssetDatabase.CreateAsset(lib, libPath);
+            }
+            lib.avatars.Clear();
+
+            (string id, string name, string emoji, Color tint)[] seeds =
+            {
+                ("fox",     "Fox",      "🦊", new Color(0.95f, 0.55f, 0.20f)),
+                ("panda",   "Panda",    "🐼", new Color(0.55f, 0.55f, 0.60f)),
+                ("rabbit",  "Rabbit",   "🐰", new Color(0.95f, 0.78f, 0.90f)),
+                ("owl",     "Owl",      "🦉", new Color(0.45f, 0.55f, 0.75f)),
+                ("monkey",  "Monkey",   "🐵", new Color(0.85f, 0.65f, 0.45f)),
+                ("cat",     "Cat",      "🐱", new Color(0.95f, 0.75f, 0.35f)),
+                ("dog",     "Dog",      "🐶", new Color(0.85f, 0.60f, 0.35f)),
+                ("unicorn", "Unicorn",  "🦄", new Color(0.85f, 0.55f, 0.90f)),
+                ("dragon",  "Dragon",   "🐲", new Color(0.40f, 0.75f, 0.45f)),
+                ("astro",   "Astro",    "🚀", new Color(0.35f, 0.50f, 0.85f)),
+            };
+
+            foreach (var s in seeds)
+            {
+                string path = $"{Root}/Avatars/Avatar_{s.id}.asset";
+                var a = AssetDatabase.LoadAssetAtPath<AvatarData>(path);
+                if (a == null)
+                {
+                    a = ScriptableObject.CreateInstance<AvatarData>();
+                    AssetDatabase.CreateAsset(a, path);
+                }
+                a.avatarId    = s.id;
+                a.displayName = s.name;
+                a.emoji       = s.emoji;
+                a.tint        = s.tint;
+                EditorUtility.SetDirty(a);
+                lib.avatars.Add(a);
+            }
+
+            EditorUtility.SetDirty(lib);
+
+            string resPath = "Assets/Resources/AvatarLibrary.asset";
+            if (!AssetDatabase.LoadAssetAtPath<AvatarLibrary>(resPath))
+                AssetDatabase.CopyAsset(libPath, resPath);
+
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+            EditorUtility.DisplayDialog("MathEdu",
+                $"Built {lib.avatars.Count} avatars.\nResources copy at:\n{resPath}",
                 "OK");
         }
 
@@ -143,6 +204,8 @@ namespace MathEdu.EditorTools
                 AssetDatabase.DeleteAsset(Root);
             if (AssetDatabase.LoadAssetAtPath<MathDatabase>("Assets/Resources/MathDatabase.asset") != null)
                 AssetDatabase.DeleteAsset("Assets/Resources/MathDatabase.asset");
+            if (AssetDatabase.LoadAssetAtPath<AvatarLibrary>("Assets/Resources/AvatarLibrary.asset") != null)
+                AssetDatabase.DeleteAsset("Assets/Resources/AvatarLibrary.asset");
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
         }
