@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: MathEdu.Runtime::MathEdu.Data.AvatarData
   avatarId: astro
   displayName: Astro
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: c3c72287193214996af4f29c39ba21ef, type: 3}
   emoji: "\U0001F680"
   tint: {r: 0.35, g: 0.5, b: 0.85, a: 1}

@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4d6b6cf7e5f56d5fa53b8da1d2b5e2c7, type: 3}
+  m_Name: UITheme
+  m_EditorClassIdentifier: MathEdu.Runtime::MathEdu.Data.UITheme
+  menuBackground: {fileID: 0}
+  gameplayBackground: {fileID: 0}
+  resultsBackground: {fileID: 0}
+  settingsBackground: {fileID: 0}
+  parentalBackground: {fileID: 0}
+  setupBackground: {fileID: 0}
+  buttonSprite: {fileID: 21300000, guid: 92e9dafa8c8e54873b9ed82e19246239, type: 3}
+  panelSprite: {fileID: 21300000, guid: 1f20989540b1d4777be144c7f0e3e33b, type: 3}
+  cardSprite: {fileID: 21300000, guid: 0357d37ff2ce1443485aa680e89d82f0, type: 3}
+  pillSprite: {fileID: 21300000, guid: 80749877ce7194ff996f8ca281ba6b17, type: 3}
+  headerSprite: {fileID: 21300000, guid: 027a9fe1720d84454abfb28fecf5cfda, type: 3}
+  starFilled: {fileID: 21300000, guid: 56e6beccc225647e4a001823c5648c74, type: 3}
+  starEmpty: {fileID: 21300000, guid: 32dbacac0bdef454c99e60e9f2e7c1ec, type: 3}
+  lockIcon: {fileID: 21300000, guid: 4ccdfbdedbf6c4f0f84ff0b9ca85af43, type: 3}
+  settingsIcon: {fileID: 21300000, guid: 957c462b960d14d18874a9955fb264bc, type: 3}
+  backArrow: {fileID: 21300000, guid: 4e6a1fcb2363648d3ba60ea7bdfdde2e, type: 3}
+  chartIcon: {fileID: 21300000, guid: 05525ca79a46c4e77acd3af78936bfb7, type: 3}
+  coinIcon: {fileID: 21300000, guid: 89da16fc7b3ef46fb8947dd2e26c0e3b, type: 3}
+  toggleOnSprite: {fileID: 21300000, guid: 0363d21a84dc6491e831bae874edc6ad, type: 3}
+  toggleOffSprite: {fileID: 21300000, guid: a1e436d26683241d787e58854a040e63, type: 3}
+  sliderBackground: {fileID: 21300000, guid: 2d22f56b817e94a6e843ab175af687bc, type: 3}
+  sliderFill: {fileID: 21300000, guid: 3da068978045a400cb4954722a0dbe2e, type: 3}
+  sliderHandle: {fileID: 21300000, guid: 91e336a3cdca649df8fc9f47d922114f, type: 3}
+  overrideColours: 1
+  bgTop: {r: 0.32, g: 0.55, b: 0.95, a: 1}
+  bgBottom: {r: 0.6, g: 0.85, b: 1, a: 1}
+  primary: {r: 0.3, g: 0.65, b: 0.95, a: 1}
+  success: {r: 0.3, g: 0.8, b: 0.45, a: 1}
+  danger: {r: 0.95, g: 0.4, b: 0.4, a: 1}
+  accent: {r: 1, g: 0.55, b: 0.2, a: 1}

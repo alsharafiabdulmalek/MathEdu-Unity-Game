@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: MathEdu.Runtime::MathEdu.Data.AvatarData
   avatarId: dragon
   displayName: Dragon
-  sprite: {fileID: 0}
+  sprite: {fileID: 21300000, guid: 23e2b16eb7e0748babf6dc861d198ed1, type: 3}
   emoji: "\U0001F432"
   tint: {r: 0.4, g: 0.75, b: 0.45, a: 1}

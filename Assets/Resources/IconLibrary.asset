@@ -1,0 +1,50 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 19baccdfca88343f99eda00edc3c2de3, type: 3}
+  m_Name: IconLibrary
+  m_EditorClassIdentifier: MathEdu.Runtime::MathEdu.Data.IconLibrary
+  gear: {fileID: 21300000, guid: 957c462b960d14d18874a9955fb264bc, type: 3}
+  parent: {fileID: 21300000, guid: 8c5076364102547da84a371d329e578b, type: 3}
+  back: {fileID: 21300000, guid: 4e6a1fcb2363648d3ba60ea7bdfdde2e, type: 3}
+  home: {fileID: 21300000, guid: 217f4a2971a284dbb9cc9ddabe9a103f, type: 3}
+  play: {fileID: 21300000, guid: c3d62e875395b46d782a2c5575cd892b, type: 3}
+  pause: {fileID: 21300000, guid: c44c60efe22da486d858d2fd6d122853, type: 3}
+  next: {fileID: 21300000, guid: 48a5d647963c64edca7ed3e2ea100043, type: 3}
+  refresh: {fileID: 21300000, guid: 21dde7e0820024b96b8501383b33ee27, type: 3}
+  star: {fileID: 21300000, guid: 56e6beccc225647e4a001823c5648c74, type: 3}
+  trophy: {fileID: 21300000, guid: 05525ca79a46c4e77acd3af78936bfb7, type: 3}
+  crown: {fileID: 21300000, guid: 2ec1ebe1c99084a05aecc027017a90b7, type: 3}
+  gem: {fileID: 21300000, guid: 7b6827dc950bb48278ef822641f23849, type: 3}
+  medal: {fileID: 21300000, guid: b3f1476f410784777a6d0ff2077e315b, type: 3}
+  badge: {fileID: 21300000, guid: f05ffdff22a41408e9d58882eb432c43, type: 3}
+  lightbulb: {fileID: 21300000, guid: 8981702bb0a0a4437ba0c523d46ed143, type: 3}
+  heart: {fileID: 21300000, guid: 76eafd9cdfd9d4cfc8dec3656a27b72e, type: 3}
+  clock: {fileID: 21300000, guid: ecb66d9b4bd404dff8d74fa4b4a72e07, type: 3}
+  check: {fileID: 21300000, guid: d5a535b5b97f54180a5138a4fc75f474, type: 3}
+  cross: {fileID: 21300000, guid: 6a5dc51452ae24521baf3a74c57344da, type: 3}
+  lockClosed: {fileID: 21300000, guid: 4ccdfbdedbf6c4f0f84ff0b9ca85af43, type: 3}
+  lockOpen: {fileID: 21300000, guid: 5b9db1795427b4c3bbb74c0273619e4b, type: 3}
+  profile: {fileID: 21300000, guid: 555476586784247dcb10c97f62468be8, type: 3}
+  musicOn: {fileID: 21300000, guid: f498f33477c4e419a8f530c74dfcce20, type: 3}
+  musicOff: {fileID: 21300000, guid: 29a2fab92c1b94e769229532ba918b97, type: 3}
+  soundOn: {fileID: 21300000, guid: 5cf0f637a2139481d9ee5cde232ea974, type: 3}
+  soundOff: {fileID: 21300000, guid: c80658c0526434a60947e3609e27855c, type: 3}
+  emojiSmile: {fileID: 21300000, guid: eb1614234433145f9a11f7165098c9df, type: 3}
+  emojiSad: {fileID: 21300000, guid: ac3ceec0a21284cd6bcbc0d30f44efc4, type: 3}
+  emojiAngry: {fileID: 21300000, guid: dce9473c9952b4cfdbdce0c70326612c, type: 3}
+  emojiWow: {fileID: 21300000, guid: 9c1015597551e4a5a80584a9918ebbe1, type: 3}
+  emojiCool: {fileID: 21300000, guid: eb1614234433145f9a11f7165098c9df, type: 3}
+  fire: {fileID: 21300000, guid: 6449341c1da5d49ef98ff74a499757f2, type: 3}
+  sparkle: {fileID: 21300000, guid: 56e6beccc225647e4a001823c5648c74, type: 3}
+  sun: {fileID: 21300000, guid: f9d20d7564a7b4b63809a8d0984f8008, type: 3}
+  flower: {fileID: 21300000, guid: 9b6c3c3f41e3e40528e98fea8fe73328, type: 3}
+  leaf: {fileID: 21300000, guid: e33f9913e27114c8180c250e80685b21, type: 3}
