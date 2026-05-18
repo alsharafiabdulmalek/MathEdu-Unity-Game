@@ -1,0 +1,5 @@
+/Users/abdulmalekabdullahalialsharafi/Documents/MathEdu-Unity-Game/.utmp/RelWithDebInfo/5s4c1h21/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/abdulmalekabdullahalialsharafi/Documents/MathEdu-Unity-Game/.utmp/RelWithDebInfo/5s4c1h21/armeabi-v7a/CMakeFiles/rebuild_cache.dir
+/Users/abdulmalekabdullahalialsharafi/Documents/MathEdu-Unity-Game/.utmp/RelWithDebInfo/5s4c1h21/armeabi-v7a/FramePacing/CMakeFiles/swappywrapper.dir
+/Users/abdulmalekabdullahalialsharafi/Documents/MathEdu-Unity-Game/.utmp/RelWithDebInfo/5s4c1h21/armeabi-v7a/FramePacing/CMakeFiles/edit_cache.dir
+/Users/abdulmalekabdullahalialsharafi/Documents/MathEdu-Unity-Game/.utmp/RelWithDebInfo/5s4c1h21/armeabi-v7a/FramePacing/CMakeFiles/rebuild_cache.dir
