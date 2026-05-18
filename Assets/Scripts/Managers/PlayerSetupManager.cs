@@ -1,25 +1,15 @@
 // -----------------------------------------------------------------------------
-// PlayerSetupManager.cs
+// PlayerSetupManager.cs (fully localized)
 // -----------------------------------------------------------------------------
-// First-launch screen. Collects:
-//   1. Player name (TextMeshPro InputField, max 16 characters)
-//   2. Avatar (grid of AvatarTile widgets backed by AvatarLibrary)
-//   3. Grade (1 / 2 / 3 buttons)
-//
-// On "Start Playing" the values are written to PlayerProfile, the
-// `setupComplete` flag is set, and we transition to the Main Menu.
-//
-// First-run safety: if the player never taps an avatar tile, we still default
-// to the first avatar in the library so the Main Menu mini-avatar lookup
-// always succeeds.
-//
-// If the AvatarLibrary is missing or empty for any reason, we build a
-// procedural 8-tile colour wheel inline so the grid is never blank.
+// First-launch screen. Every visible string flows through Localization.T()
+// so the experience reads naturally in either English or Arabic the moment
+// the player lands here.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
 using MathEdu.Data;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -44,30 +34,26 @@ namespace MathEdu.Managers
             Build();
         }
 
-        // -------------------------------------------------------------------
-        // UI construction
-        // -------------------------------------------------------------------
         private void Build()
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[PlayerSetupCanvas]");
             UIFactory.CreateThemedBackground(safe, "setup");
 
-            // ----- Header -----
+            // Header
             var header = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.90f), new Vector2(1, 1f),
                 UIFactory.Primary, 0, "Header");
-            UIFactory.CreateText(header, "Welcome!", 64,
+            UIFactory.CreateText(header, Localization.T("setup.welcome"), 64,
                 Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
-            // ----- Tagline -----
             var sub = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.84f), new Vector2(1, 0.90f),
                 new Color(0, 0, 0, 0.20f), 0, "Sub");
-            UIFactory.CreateText(sub, "Let's set up your player profile.", 32,
+            UIFactory.CreateText(sub, Localization.T("setup.subtitle"), 32,
                 Color.white, TextAlignmentOptions.Center, "SubTxt");
 
-            // ----- Name input -----
+            // Name input
             var nameRow = UIFactory.CreatePanel(safe,
                 new Vector2(0.05f, 0.74f), new Vector2(0.95f, 0.83f),
                 UIFactory.Card, 24, "NameRow");
@@ -78,42 +64,40 @@ namespace MathEdu.Managers
             nrt.offsetMin = new Vector2(24, 16); nrt.offsetMax = new Vector2(-24, -16);
             var nhl = nameCol.GetComponent<HorizontalLayoutGroup>();
             nhl.spacing = 16; nhl.childForceExpandWidth = false;
-            nhl.childAlignment = TextAnchor.MiddleLeft;
+            nhl.childAlignment = Localization.IsRTL ? TextAnchor.MiddleRight : TextAnchor.MiddleLeft;
 
-            var nameLbl = UIFactory.CreateText((RectTransform)nameCol.transform, "Name:", 38,
-                UIFactory.TextDark, TextAlignmentOptions.MidlineLeft, "Lbl");
+            var nameLbl = UIFactory.CreateText((RectTransform)nameCol.transform,
+                Localization.T("setup.name_label"), 38,
+                UIFactory.TextDark,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Lbl");
             nameLbl.fontStyle = FontStyles.Bold;
             var nle = nameLbl.gameObject.AddComponent<LayoutElement>();
-            nle.preferredWidth = 160;
+            nle.preferredWidth = 200;
 
             _nameInput = UIFactory.CreateInputField((RectTransform)nameCol.transform,
-                "What's your name?", 38, "NameInput");
+                Localization.T("setup.name_placeholder"), 38, "NameInput");
             _nameInput.text = _profile.playerName == "Player" ? "" : _profile.playerName;
             _nameInput.characterLimit = 16;
             var ile = _nameInput.gameObject.AddComponent<LayoutElement>();
             ile.flexibleWidth = 1;
             ile.preferredHeight = 110;
 
-            // ----- Avatar grid title -----
+            // Avatar grid label
             var avLbl = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.68f), new Vector2(1, 0.73f),
                 new Color(0, 0, 0, 0.15f), 0, "AvLblHolder");
-            UIFactory.CreateText(avLbl, "Pick an avatar:", 36,
+            UIFactory.CreateText(avLbl, Localization.T("setup.pick_avatar"), 36,
                 Color.white, TextAlignmentOptions.Center, "AvLbl")
                 .fontStyle = FontStyles.Bold;
 
-            // ----- Avatar grid -----
+            // Avatar grid
             var scroll = UIFactory.CreateScrollView(safe, "AvatarScroll");
             var srt = (RectTransform)scroll.transform;
             srt.anchorMin = new Vector2(0.02f, 0.30f); srt.anchorMax = new Vector2(0.98f, 0.68f);
             srt.offsetMin = Vector2.zero; srt.offsetMax = Vector2.zero;
 
             var content = scroll.content;
-            // DestroyImmediate (not Destroy) is required here: LayoutGroup has
-            // [DisallowMultipleComponent], so the VerticalLayoutGroup must be
-            // removed *synchronously* before AddComponent<GridLayoutGroup>()
-            // below — Destroy() is deferred to end-of-frame, which would
-            // leave the VLG attached and cause AddComponent to return null.
             DestroyImmediate(content.GetComponent<VerticalLayoutGroup>());
             var grid = content.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(260, 320);
@@ -124,13 +108,11 @@ namespace MathEdu.Managers
 
             BuildAvatarGrid(content);
 
-            // ----- Grade selector -----
+            // Grade selector
             var gradeBar = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.20f), new Vector2(1, 0.29f),
                 new Color(0, 0, 0, 0.25f), 0, "GradeBar");
-            // TMP doesn't expose an "UpperCenter" enum value — use Top (which
-            // anchors the text to the top of its rect and centers it horizontally).
-            UIFactory.CreateText(gradeBar, "Choose your grade:", 32,
+            UIFactory.CreateText(gradeBar, Localization.T("setup.choose_grade"), 32,
                 Color.white, TextAlignmentOptions.Top, "GradeLbl");
 
             var gradeRow = new GameObject("GradeRow",
@@ -148,15 +130,15 @@ namespace MathEdu.Managers
             {
                 int captured = g;
                 var btn = UIFactory.CreateButton((RectTransform)gradeRow.transform,
-                    $"Grade {g}",
+                    Localization.T("setup.grade_n", g),
                     g == _selectedGrade ? UIFactory.Accent : UIFactory.Primary,
                     40, $"GradeBtn_{g}");
                 btn.onClick.AddListener(() => OnGradePicked(captured));
                 _gradeButtons.Add(btn);
             }
 
-            // ----- Start Playing -----
-            var startBtn = UIFactory.CreateButton(safe, "Start Playing!",
+            // Start playing
+            var startBtn = UIFactory.CreateButton(safe, Localization.T("setup.start_playing"),
                 UIFactory.Success, 56, "StartBtn");
             var sbrt = (RectTransform)startBtn.transform;
             sbrt.anchorMin = new Vector2(0.10f, 0.06f); sbrt.anchorMax = new Vector2(0.90f, 0.16f);
@@ -164,9 +146,7 @@ namespace MathEdu.Managers
             sbrt.sizeDelta = Vector2.zero;
             startBtn.onClick.AddListener(OnStartPlaying);
 
-            // Small footer hint, pinned to the very bottom of the safe area.
-            var footer = UIFactory.CreateText(safe,
-                "You can change these later in Settings.",
+            var footer = UIFactory.CreateText(safe, Localization.T("setup.footer"),
                 26, new Color(1, 1, 1, 0.7f),
                 TextAlignmentOptions.Center, "Footer");
             var frt = footer.rectTransform;
@@ -179,7 +159,7 @@ namespace MathEdu.Managers
             var library = GameManager.Instance.Avatars;
             if (library == null || library.avatars == null || library.avatars.Count == 0)
             {
-                Debug.LogWarning("[PlayerSetup] AvatarLibrary missing — using runtime defaults.");
+                Debug.LogWarning("[PlayerSetup] AvatarLibrary missing - using runtime defaults.");
                 library = AvatarLibrary.BuildDefault();
                 GameManager.Instance.avatarLibrary = library;
             }
@@ -198,10 +178,6 @@ namespace MathEdu.Managers
                 }
             }
 
-            // If the player profile's avatarId doesn't match any library entry
-            // (very common on a fresh profile where avatarId == "default"),
-            // pre-select the first tile so the user is never sent to MainMenu
-            // with an unresolved avatar reference.
             if (_selectedTile == null && firstTile != null)
             {
                 _selectedTile = firstTile;
@@ -210,9 +186,6 @@ namespace MathEdu.Managers
             }
         }
 
-        // -------------------------------------------------------------------
-        // Event handlers
-        // -------------------------------------------------------------------
         private void OnAvatarPicked(AvatarData avatar)
         {
             GameManager.Instance.Audio.PlaySFX("tap");
@@ -247,12 +220,9 @@ namespace MathEdu.Managers
         {
             GameManager.Instance.Audio.PlaySFX("levelComplete");
 
-            // Trim + sanity-check the name. Empty → "Player".
             string nm = (_nameInput != null ? _nameInput.text : "")?.Trim();
             if (string.IsNullOrEmpty(nm)) nm = "Player";
 
-            // If somehow no avatar was selected, default to the first one in
-            // the library so the Main Menu never shows an empty avatar.
             if (string.IsNullOrEmpty(_selectedAvatarId)
                 || GameManager.Instance.Avatars.FindById(_selectedAvatarId) == null)
             {

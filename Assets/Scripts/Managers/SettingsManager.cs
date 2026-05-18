@@ -1,18 +1,17 @@
 // -----------------------------------------------------------------------------
 // SettingsManager.cs
 // -----------------------------------------------------------------------------
-// Builds the Settings scene at runtime:
-//   • Music ON/OFF toggle + volume slider
-//   • SFX ON/OFF toggle + volume slider
-//   • Haptics toggle
-//   • Language placeholder (English by default)
-//   • Change Parental PIN (current → new → confirm flow)
-//   • Reset Player Progress (PIN-gated)
-//   • Back button → Main Menu
+// Builds the Settings scene at runtime with full i18n. Sections:
+//   - Music ON/OFF + volume slider
+//   - Sound effects ON/OFF + volume slider
+//   - Haptics toggle
+//   - Language selector (English / Arabic)
+//   - Change Parental PIN (3-step flow)
+//   - Reset Player Progress (PIN-gated)
 //
-// All changes are written straight to PlayerProfile and flushed to JSON via
-// GameManager.SaveProfile *immediately* on every toggle/slider event, so the
-// player never has to back out to persist a setting.
+// All changes flush to JSON via GameManager.SaveProfile() immediately.
+// Switching language saves the choice, applies it, and reloads the
+// Settings scene so every string re-renders in the new language.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -32,6 +31,8 @@ namespace MathEdu.Managers
         private ToggleSwitch _musicToggle;
         private ToggleSwitch _sfxToggle;
         private ToggleSwitch _hapticsToggle;
+        private Button _langEnBtn;
+        private Button _langArBtn;
 
         private void Start()
         {
@@ -40,20 +41,16 @@ namespace MathEdu.Managers
             Build();
         }
 
-        // -------------------------------------------------------------------
-        // UI construction
-        // -------------------------------------------------------------------
         private void Build()
         {
             var (canvas, safe) = UIFactory.CreateCanvas("[SettingsCanvas]");
             UIFactory.CreateThemedBackground(safe, "settings");
 
-            // Header
             var header = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.88f), new Vector2(1, 1f),
                 UIFactory.Primary, 0, "Header");
 
-            UIFactory.CreateText(header, "Settings", 64, Color.white,
+            UIFactory.CreateText(header, Localization.T("settings.title"), 64, Color.white,
                 TextAlignmentOptions.Center, "Title").fontStyle = FontStyles.Bold;
 
             var back = UIFactory.CreateIconButton(header, "<", new Color(0, 0, 0, 0.35f), "Back");
@@ -68,7 +65,6 @@ namespace MathEdu.Managers
                 GameManager.Instance.UI.Go(UIManager.SceneMainMenu);
             });
 
-            // Body — scroll view so all rows fit on small phones
             var scroll = UIFactory.CreateScrollView(safe, "SettingsScroll");
             var srt = (RectTransform)scroll.transform;
             srt.anchorMin = new Vector2(0.05f, 0.06f); srt.anchorMax = new Vector2(0.95f, 0.88f);
@@ -76,15 +72,13 @@ namespace MathEdu.Managers
 
             var content = scroll.content;
 
-            // ----- Music -----
-            BuildSection(content, "🎵  Music",
+            BuildSection(content, Localization.T("settings.music"),
                 _profile.musicOn, _profile.musicVolume,
                 onToggle: v => { _profile.musicOn = v; ApplyVolumes(); Save(); },
                 onSlider: v => { _profile.musicVolume = v; ApplyVolumes(); Save(); },
                 out _musicToggle, out _musicSlider);
 
-            // ----- SFX -----
-            BuildSection(content, "🔊  Sound Effects",
+            BuildSection(content, Localization.T("settings.sfx"),
                 _profile.sfxOn, _profile.sfxVolume,
                 onToggle: v =>
                 {
@@ -96,29 +90,23 @@ namespace MathEdu.Managers
                 onSlider: v => { _profile.sfxVolume = v; ApplyVolumes(); Save(); },
                 out _sfxToggle, out _sfxSlider);
 
-            // ----- Haptics -----
-            BuildToggleRow(content, "📳  Haptics", _profile.hapticsOn,
+            BuildToggleRow(content, Localization.T("settings.haptics"), _profile.hapticsOn,
                 v => { _profile.hapticsOn = v; Save(); }, out _hapticsToggle);
 
-            // ----- Language placeholder -----
             BuildLanguageRow(content);
 
-            // ----- Change PIN -----
             var pinBtn = UIFactory.CreateButton(content,
-                "🔐  Change Parental PIN…", UIFactory.Primary, 36, "PinBtn");
+                Localization.T("settings.change_pin"), UIFactory.Primary, 36, "PinBtn");
             pinBtn.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
             pinBtn.onClick.AddListener(BeginChangePin);
 
-            // ----- Reset Progress -----
             var resetBtn = UIFactory.CreateButton(content,
-                "Reset Player Progress…", UIFactory.Danger, 36, "ResetBtn");
+                Localization.T("settings.reset_progress"), UIFactory.Danger, 36, "ResetBtn");
             var rle = resetBtn.gameObject.AddComponent<LayoutElement>();
             rle.preferredHeight = 130; rle.minHeight = 100;
             resetBtn.onClick.AddListener(ConfirmReset);
 
-            // About
-            var about = UIFactory.CreateText(content,
-                "MathEdu • Unity 6000.4.4f1 • Built for kids who love numbers.",
+            var about = UIFactory.CreateText(content, Localization.T("settings.about"),
                 26, new Color(0.30f, 0.35f, 0.45f), TextAlignmentOptions.Center, "About");
             var ale = about.gameObject.AddComponent<LayoutElement>();
             ale.preferredHeight = 80;
@@ -136,7 +124,6 @@ namespace MathEdu.Managers
             var le = row.GetComponent<LayoutElement>();
             le.preferredHeight = 200; le.minHeight = 180;
 
-            // Title row
             var titleRow = new GameObject("TitleRow",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup));
             titleRow.transform.SetParent(rt, false);
@@ -145,12 +132,13 @@ namespace MathEdu.Managers
             trt.offsetMin = Vector2.zero; trt.offsetMax = Vector2.zero;
             var thl = titleRow.GetComponent<HorizontalLayoutGroup>();
             thl.spacing = 16;
-            thl.padding = new RectOffset(0, 0, 0, 0);
             thl.childForceExpandWidth = true;
             thl.childAlignment = TextAnchor.MiddleLeft;
 
             var titleTxt = UIFactory.CreateText((RectTransform)titleRow.transform, title, 40,
-                UIFactory.TextDark, TextAlignmentOptions.MidlineLeft, "Title");
+                UIFactory.TextDark,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Title");
             titleTxt.fontStyle = FontStyles.Bold;
             var tle = titleTxt.gameObject.AddComponent<LayoutElement>();
             tle.flexibleWidth = 1;
@@ -160,7 +148,6 @@ namespace MathEdu.Managers
             sle.preferredWidth = 200; sle.preferredHeight = 90;
             toggle.onValueChanged += b => onToggle?.Invoke(b);
 
-            // Slider row
             slider = UIFactory.CreateSlider(rt, sliderInitial, "Slider");
             var srt = (RectTransform)slider.transform;
             srt.anchorMin = new Vector2(0, 0); srt.anchorMax = new Vector2(1, 0.55f);
@@ -182,7 +169,9 @@ namespace MathEdu.Managers
             le.preferredHeight = 100; le.minHeight = 100;
 
             var lbl = UIFactory.CreateText((RectTransform)row.transform, title, 40,
-                UIFactory.TextDark, TextAlignmentOptions.MidlineLeft, "Lbl");
+                UIFactory.TextDark,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Lbl");
             lbl.fontStyle = FontStyles.Bold;
             var lle = lbl.gameObject.AddComponent<LayoutElement>();
             lle.flexibleWidth = 1;
@@ -193,6 +182,9 @@ namespace MathEdu.Managers
             toggle.onValueChanged += b => onChanged?.Invoke(b);
         }
 
+        // -------------------------------------------------------------------
+        // Language row (English / Arabic chooser with live scene reload)
+        // -------------------------------------------------------------------
         private void BuildLanguageRow(RectTransform parent)
         {
             var row = new GameObject("LangRow",
@@ -200,32 +192,53 @@ namespace MathEdu.Managers
             row.transform.SetParent(parent, false);
             var hl = row.GetComponent<HorizontalLayoutGroup>();
             hl.spacing = 16;
-            hl.childForceExpandWidth = true;
+            hl.childForceExpandWidth = false;
             hl.childAlignment = TextAnchor.MiddleLeft;
             var le = row.GetComponent<LayoutElement>();
-            le.preferredHeight = 110; le.minHeight = 100;
+            le.preferredHeight = 130; le.minHeight = 120;
 
-            var lbl = UIFactory.CreateText((RectTransform)row.transform, "🌐  Language", 40,
-                UIFactory.TextDark, TextAlignmentOptions.MidlineLeft, "Lbl");
+            var lbl = UIFactory.CreateText((RectTransform)row.transform,
+                Localization.T("settings.language"), 40, UIFactory.TextDark,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Lbl");
             lbl.fontStyle = FontStyles.Bold;
             var lle = lbl.gameObject.AddComponent<LayoutElement>();
             lle.flexibleWidth = 1;
 
-            var btn = UIFactory.CreateButton((RectTransform)row.transform,
-                _profile.language == "en" ? "English" : _profile.language,
-                UIFactory.Primary, 32, "LangBtn");
-            var tle = btn.gameObject.AddComponent<LayoutElement>();
-            tle.preferredWidth = 320; tle.preferredHeight = 90;
-            btn.onClick.AddListener(() =>
-            {
-                // Placeholder — real i18n hooks would swap a TMP_FontAsset + dictionary.
-                GameManager.Instance.Audio.PlaySFX("tap");
-            });
+            bool isEn = Localization.Current == Localization.Lang.English;
+
+            _langEnBtn = UIFactory.CreateButton((RectTransform)row.transform,
+                Localization.T("settings.lang_en"),
+                isEn ? UIFactory.Accent : UIFactory.Primary,
+                32, "LangEnBtn");
+            var le1 = _langEnBtn.gameObject.AddComponent<LayoutElement>();
+            le1.preferredWidth = 220; le1.preferredHeight = 100;
+            _langEnBtn.onClick.AddListener(() => SwitchLanguage(Localization.Lang.English));
+
+            _langArBtn = UIFactory.CreateButton((RectTransform)row.transform,
+                Localization.T("settings.lang_ar"),
+                !isEn ? UIFactory.Accent : UIFactory.Primary,
+                32, "LangArBtn");
+            var le2 = _langArBtn.gameObject.AddComponent<LayoutElement>();
+            le2.preferredWidth = 220; le2.preferredHeight = 100;
+            _langArBtn.onClick.AddListener(() => SwitchLanguage(Localization.Lang.Arabic));
         }
 
-        // -------------------------------------------------------------------
-        // Behaviour
-        // -------------------------------------------------------------------
+        private void SwitchLanguage(Localization.Lang lang)
+        {
+            if (Localization.Current == lang)
+            {
+                GameManager.Instance.Audio.PlaySFX("tap");
+                return;
+            }
+            GameManager.Instance.Audio.PlaySFX("levelComplete");
+            _profile.language = lang == Localization.Lang.Arabic ? "ar" : "en";
+            Localization.SetLanguage(lang);
+            Save();
+            // Reload Settings scene so every string re-renders in the new language.
+            GameManager.Instance.UI.Go(UIManager.SceneSettings);
+        }
+
         private void ApplyVolumes()
         {
             float music = _profile.musicOn ? _profile.musicVolume : 0f;
@@ -237,14 +250,14 @@ namespace MathEdu.Managers
         private void Save() => GameManager.Instance.SaveProfile();
 
         // -------------------------------------------------------------------
-        // PIN change flow: current → new → confirm
+        // PIN change + reset flows (all localized)
         // -------------------------------------------------------------------
         private void BeginChangePin()
         {
             GameManager.Instance.Audio.PlaySFX("tap");
             PasswordDialog.Show(
-                "Enter current PIN",
-                "Verify the parental PIN before changing it.",
+                Localization.T("settings.pin_current_title"),
+                Localization.T("settings.pin_current_body"),
                 onSubmit: current =>
                 {
                     if (current != _profile.parentalPin)
@@ -259,8 +272,8 @@ namespace MathEdu.Managers
         private void PromptNewPin()
         {
             PasswordDialog.Show(
-                "New PIN",
-                "Pick a 4–8 digit PIN.",
+                Localization.T("settings.pin_new_title"),
+                Localization.T("settings.pin_new_body"),
                 onSubmit: newPin =>
                 {
                     if (string.IsNullOrEmpty(newPin) || newPin.Length < 4)
@@ -275,8 +288,8 @@ namespace MathEdu.Managers
         private void PromptConfirmPin(string newPin)
         {
             PasswordDialog.Show(
-                "Confirm PIN",
-                "Type the new PIN again.",
+                Localization.T("settings.pin_confirm_title"),
+                Localization.T("settings.pin_confirm_body"),
                 onSubmit: confirm =>
                 {
                     if (confirm == newPin)
@@ -295,8 +308,8 @@ namespace MathEdu.Managers
         private void ConfirmReset()
         {
             PasswordDialog.Show(
-                "Reset Progress?",
-                "Parental PIN required.",
+                Localization.T("settings.reset_title"),
+                Localization.T("settings.reset_body"),
                 onSubmit: pin =>
                 {
                     if (pin == _profile.parentalPin)
