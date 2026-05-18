@@ -70,7 +70,8 @@ namespace MathEdu.Modes
             _wrong++;
             _currentStreak = 0;
             GameManager.Instance.Session.failedEarly = true;
-            _feedback.ShowWrong("Too slow!");
+            _feedback.ShowWrong("Too slow!", surprised: true);
+            if (_reactionFace != null) _reactionFace.Surprised();
             GameManager.Instance.VFX?.PlayWrong();
             StartCoroutine(FinishDelayed());
         }
