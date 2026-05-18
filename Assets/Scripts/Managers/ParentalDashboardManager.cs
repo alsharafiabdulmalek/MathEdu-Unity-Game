@@ -77,7 +77,7 @@ namespace MathEdu.Managers
             UIFactory.CreateText(header, "Parental Dashboard", 56,
                 Color.white, TextAlignmentOptions.Center, "Title").fontStyle = FontStyles.Bold;
 
-            var back = UIFactory.CreateIconButton(header, "<", new Color(0, 0, 0, 0.35f), "Back");
+            var back = IconService.IconButton(header, "back", "<", new Color(0, 0, 0, 0.35f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
@@ -306,7 +306,7 @@ namespace MathEdu.Managers
                 Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
-            var back = UIFactory.CreateIconButton(header, "<", new Color(0, 0, 0, 0.35f), "Back");
+            var back = IconService.IconButton(header, "back", "<", new Color(0, 0, 0, 0.35f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
