@@ -109,7 +109,12 @@ namespace MathEdu.Managers
             srt.offsetMin = Vector2.zero; srt.offsetMax = Vector2.zero;
 
             var content = scroll.content;
-            Destroy(content.GetComponent<VerticalLayoutGroup>());
+            // DestroyImmediate (not Destroy) is required here: LayoutGroup has
+            // [DisallowMultipleComponent], so the VerticalLayoutGroup must be
+            // removed *synchronously* before AddComponent<GridLayoutGroup>()
+            // below — Destroy() is deferred to end-of-frame, which would
+            // leave the VLG attached and cause AddComponent to return null.
+            DestroyImmediate(content.GetComponent<VerticalLayoutGroup>());
             var grid = content.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(260, 320);
             grid.spacing  = new Vector2(20, 20);
