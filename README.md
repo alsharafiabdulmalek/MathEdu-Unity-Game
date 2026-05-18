@@ -18,13 +18,13 @@ click:
 ```bash
 git clone https://github.com/alsharafiabdulmalek/MathEdu-Unity-Game.git
 # Open in Unity Hub with Unity 6000.4.4f1
-# MathEdu → Run Full Setup (DB + Avatars + Scenes)
+# MathEdu → Polish → ✨ Run Full Polish Setup (scenes + theme + icons)
 # Open Assets/Scenes/Bootstrap.unity, press ▶ Play
 ```
 
-That's it — the database, avatars, and 13 scenes are generated in under
-a minute. (If you prefer running the steps individually, see the
-[Quick start](#quick-start) section.)
+That's it — the database, avatars, scenes, the polished UITheme.asset and
+IconLibrary.asset are all generated in well under a minute. (If you prefer
+running the steps individually, see the [Quick start](#quick-start) section.)
 
 > **Recovering from a Unity hang?**
 > If a previous attempt to run `MathEdu → Build Default Database` froze
@@ -33,15 +33,15 @@ a minute. (If you prefer running the steps individually, see the
 
 | Flow | Outcome |
 |---|---|
-| **First launch** | Splash → PlayerSetup. Type name, pick avatar, pick grade, "Start Playing!" |
-| **Main Menu** | Avatar mini + name + 11 subject cards visible, grade strip top, stars/XP/badges in header |
-| **Pick a subject** | LevelSelect: 20 tiles, Level 1 always unlocked, others 🔒 |
-| **Pick Level 1 + Quiz** | 10 questions, 30 s timer per question with colour + pulse, "Time's up!" if expired |
-| **Finish a level** | Results: animated star pop‑ins, badges (if any), XP, Score, Menu / Retry / Next |
+| **First launch** | Animated splash 📚 → PlayerSetup. Type name, pick avatar (with GUI Pro character art), pick grade, "Start Playing!" |
+| **Main Menu** | Avatar mini + name + 11 subject cards visible, grade strip top, stars/XP/badges in header. Settings & Parental buttons show real Pictoicons. |
+| **Pick a subject** | LevelSelect: 20 tiles, polished star icons with glow halo on unlocked tiles, lock sprite on locked ones |
+| **Pick Level 1 + Quiz** | 10 questions, animated reaction face puck reacts to every answer, streak counter on the pill, emoji confetti puffs on correct |
+| **Finish a level** | Results: trophy icon, animated star pop‑ins with glow halos, badges, XP, Score, full-screen confetti rain on win, delayed badge sprinkle |
 | **Earn ≥ 1 star** | Level 2 unlocks; tap "Next Level" to play it immediately |
 | **Speed Round wrong answer** | Run ends immediately, Results shows "Survived X questions" |
 | **Return to LevelSelect** | Level 1 shows the earned star count, Level 2 unlocked, Level 3+ still 🔒 |
-| **Settings / Parental Dashboard** | Reachable from Main Menu, PIN gate uses keypad, slides up on success |
+| **Settings / Parental Dashboard** | Reachable from Main Menu, icon-led rows (🎵 music / 🔊 sfx / 📳 haptics), PIN gate keypad slides up on success |
 
 No null reference exceptions in Console during any of the above. All 5
 learning modes (Learn / Practice / Quiz / Story / Speed Round) are playable
@@ -53,19 +53,20 @@ from Level 1 of every subject across grades 1–3.
 
 1. [Quick start](#quick-start)
 2. [How to test each mode](#how-to-test-each-mode)
-3. [Project structure](#project-structure)
-4. [Math curriculum](#math-curriculum)
-5. [Learning modes](#learning-modes)
-6. [Badges](#badges)
-7. [Architecture overview](#architecture-overview)
-8. [Scene flow](#scene-flow)
-9. [Adding artwork (sprites you'll provide)](#adding-artwork)
-10. [Epic Toon FX integration](#epic-toon-fx-integration)
-11. [Editor menu reference](#editor-menu-reference)
-12. [Mobile build settings](#mobile-build-settings)
-13. [Known issues](#known-issues)
-14. [Remaining manual steps](#remaining-manual-steps)
-15. [Roadmap](#roadmap)
+3. [Polish pass — engagement visuals](#polish-pass--engagement-visuals)
+4. [Project structure](#project-structure)
+5. [Math curriculum](#math-curriculum)
+6. [Learning modes](#learning-modes)
+7. [Badges](#badges)
+8. [Architecture overview](#architecture-overview)
+9. [Scene flow](#scene-flow)
+10. [Adding artwork (sprites you'll provide)](#adding-artwork)
+11. [Epic Toon FX integration](#epic-toon-fx-integration)
+12. [Editor menu reference](#editor-menu-reference)
+13. [Mobile build settings](#mobile-build-settings)
+14. [Known issues](#known-issues)
+15. [Remaining manual steps](#remaining-manual-steps)
+16. [Roadmap](#roadmap)
 
 ---
 
@@ -83,10 +84,12 @@ from Level 1 of every subject across grades 1–3.
 
    #### Path A — one click (recommended)
    ```
-   MathEdu → Run Full Setup (DB + Avatars + Scenes)
+   MathEdu → Polish → ✨ Run Full Polish Setup (scenes + theme + icons)
    ```
-   Sequentially runs the three builds with progress bars. Total time:
-   under a minute on a modern Mac.
+   Runs Quick Start (avatars + scenes) **plus** builds the polished
+   `UITheme.asset` + `IconLibrary.asset` so every screen automatically picks
+   up the GUI Pro - Casual Game sprites. Total time: well under a minute
+   even on a constrained machine.
 
    #### Path B — three clicks (same result, more visible)
    - `MathEdu → Build Default Database` — generates ~4,800 questions as
@@ -125,9 +128,9 @@ MainMenu → Subject → Level → ModeSelect → \[mode\]:
 
 | Mode | What to check |
 |---|---|
-| **Learn** | 3 example questions auto‑reveal the correct answer (1.5 s show, then highlight green + hint, then 2.5 s pause). After "Now it's YOUR turn!" 7 practice questions follow with hints visible. Back returns to ModeSelect. |
-| **Practice** | 10 untimed questions, hints available via the 💡 button. Mistakes don't penalise. Pause button (top‑right) freezes Time.timeScale. |
-| **Quiz** | 10 timed questions with a Timer that turns green → yellow → red, pulses below 20 % fill, ticks every second below 5 s, and plays the alarm SFX on expiry. Score gets a small time bonus per fast answer. |
+| **Learn** | A MascotHost in the bottom-left "talks" the player through 3 auto-reveal examples and 7 practice questions. Correct answers fire an emoji burst; wrong ones make the mascot frown and say "Try again — you can do it!" |
+| **Practice** | 10 untimed questions, hints available via the 💡 button. Mistakes don't penalise. Pause button (top‑right) freezes Time.timeScale. ReactionFace puck reacts to every answer. |
+| **Quiz** | 10 timed questions with a Timer that turns green → yellow → red, pulses below 20 % fill, ticks every second below 5 s, and plays the alarm SFX on expiry. Timer expiry triggers a *surprised* reaction face + "Time's up!" pill. Score gets a small time bonus per fast answer. |
 | **Story** | Same MCQ loop as Practice with a themed banner. Per‑subject intros & outros (Farmer Jenny / 🍕 pizza / Architect Aria etc.). |
 | **Speed Round** | Up to 50 questions; a single wrong answer ends the run. Pause is disabled by design. Results shows "Survived X questions". A 25‑in‑a‑row streak unlocks the Speed Demon badge. |
 
@@ -149,6 +152,50 @@ To verify Settings persistence:
 
 ---
 
+## Polish pass — engagement visuals
+
+The "Polish Pass" layer ships a set of small but high-impact upgrades:
+
+| System | What it does |
+|---|---|
+| **`MathEdu / Polish / ✨ Run Full Polish Setup`** | One-click: builds avatars, scenes, **and** wires the GUI Pro - Casual Game sprite pack into `UITheme.asset` + `IconLibrary.asset` under `Assets/Resources/`. After this, every screen uses GUI Pro buttons, frames, popups, sliders, toggles, and pictoicons automatically. |
+| **`IconLibrary` ScriptableObject** | Maps named keys (`gear`, `star`, `bulb`, `heart`, `emojiSmile`, …) to sprites. Resolved at runtime through `IconService`. Drop in your own art at any time; missing slots fall back to emoji glyphs so nothing ever breaks. |
+| **`ReactionFace` widget** | A small bouncing face puck that lives next to the question card. Reacts in real-time: 😄 happy on correct, 🤩 cheer on streaks ≥ 3, 😢 sad on wrong, 😮 surprised on timer expiry. Sprite-or-glyph; uses `Pictoicon_Emoji_*` from GUI Pro when present. |
+| **`MascotHost`** | A larger cartoon mascot with body, head, blush, speech bubble. Used in Learn Mode to "talk" the player through the lesson. Speaks praise on correct answers, encouragement on wrong, and a final cheer when the lesson ends. |
+| **`EmojiBurst`** | Procedural confetti / emoji puffs spawned at any anchored position: `Correct` (⭐ ✨), `Cheer` (🎉 🔥 ⭐ on streaks), `Win` (full-screen 🎊 🥳 🏆 confetti rain on Results), `Badge` (🏅 sprinkle when a new badge is earned), and a discreet `Wrong` (💧). |
+| **`PolishSprites`** | Procedural star, glow halo, ring, and shadowed-rounded-rect generators. Used by Results star widgets, the level-select tiles, the answer buttons, and the AnimatedFeedback pill. |
+| **`AnimatedFeedback` 2.0** | The big "✓ Correct!" pill now ships with a reaction face, a streak counter (`x3 Streak!`), ease-out-back scale-in, and an emoji burst behind it. Wrong answers play a horizontal shake and stamp a red ✗ on the chosen button. |
+| **Answer button feedback** | Correct flash → green colour + scale-punch + green ✓ stamp icon. Wrong flash → red colour + shake + red ✗ stamp icon. Always uses sprite-or-glyph from the IconLibrary. |
+| **Bootstrap splash** | The splash scene now scale-in animates the wordmark + 📚 mark with ease-out-back and a gentle idle bob. |
+| **Level Select / Results stars** | Use the polished 5-point star sprite (or the GUI Pro `Pictoicon_Star` when wired) with a soft glow halo on filled stars. |
+| **Settings rows** | Music, SFX, and Haptics rows now show their icon (sprite or glyph) on the left for instant readability. |
+| **Main Menu icons** | The ⚙ Settings and 👪 Parental Controls buttons auto-upgrade to real `Pictoicon_Setting` / `Pictoicon_Account` art when the IconLibrary is present. |
+| **Polished gradient background** | Every gradient background now has a soft radial glow overlay that mimics a cheap post-process bloom — no URP or Post-Processing dependencies. |
+
+### Asset sourcing
+
+Every additional visual is built from one of three sources, all of which are
+already in the repo or generated procedurally:
+
+| Source | Used for | Licence |
+|---|---|---|
+| **GUI Pro - Casual Game** (Layer Lab) | Buttons, frames, popups, sliders, toggles, ~640 PictoIcons, ~20 cartoon characters used as avatar art. Already imported under `Assets/Sprites/UI/Layer Lab UI Assets/GUI Pro-CasualGame/`. | Bundled with project under Layer Lab's user-asset guide (see `Assets/Sprites/UI/Layer Lab UI Assets/GUI Pro-CasualGame/+README+/LayerLab_UserAssetGuide.txt`). |
+| **Unicode emoji glyphs** | Engagement visuals — used as the live fallback whenever a sprite slot is empty, so the game is fully expressive even with no art. | Public domain — Unicode standard glyphs rendered by the device font. |
+| **Procedural (PolishSprites)** | Star, glow halo, ring, shadowed rounded rect. Built once at runtime, cached. | All-original code in this repo. |
+
+No third-party packages were added — everything works against the same
+`com.unity.textmeshpro` + `com.unity.ugui` packages already in `manifest.json`.
+
+### Quick start (polish)
+
+```
+MathEdu → Polish → ✨ Run Full Polish Setup (scenes + theme + icons)
+```
+
+That's it. Open `Assets/Scenes/Bootstrap.unity` and press **▶ Play**.
+
+---
+
 ## Project structure
 
 ```
@@ -165,6 +212,7 @@ Assets/
 │   │   ├── AvatarData.cs
 │   │   ├── AvatarLibrary.cs
 │   │   ├── UITheme.cs
+│   │   ├── IconLibrary.cs             # POLISH: named sprite mapping
 │   │   └── VFXLibrary.cs
 │   ├── Utility/
 │   │   ├── QuestionGenerator.cs       # L1–10 single-step, L11–20 word problems
@@ -183,14 +231,19 @@ Assets/
 │   ├── UI/
 │   │   ├── UIFactory.cs               # Theme-aware procedural Canvas/TMP builder
 │   │   ├── UIThemeService.cs
+│   │   ├── IconService.cs             # POLISH: sprite-first / glyph-fallback facade
 │   │   ├── DefaultSprite.cs           # Procedural rounded-rect, gradient, circle
+│   │   ├── PolishSprites.cs           # POLISH: star / glow / ring / shadowed RR
 │   │   ├── SafeAreaHandler.cs
 │   │   ├── FadeOverlay.cs
-│   │   ├── AnswerButton.cs
+│   │   ├── AnswerButton.cs            # POLISH: ✓/✗ stamp + scale-punch / shake
 │   │   ├── StarRating.cs
 │   │   ├── ProgressBar.cs
 │   │   ├── Timer.cs                   # Threshold colours + pulse + tick SFX
-│   │   ├── AnimatedFeedback.cs
+│   │   ├── AnimatedFeedback.cs        # POLISH: face puck + streak counter + burst
+│   │   ├── ReactionFace.cs            # POLISH: animated mood widget
+│   │   ├── MascotHost.cs              # POLISH: full-body cartoon host
+│   │   ├── EmojiBurst.cs              # POLISH: confetti / emoji puffs
 │   │   ├── QuestionVisualRenderer.cs  # Clock, dots, fractions, etc.
 │   │   ├── ToggleSwitch.cs
 │   │   ├── AvatarTile.cs
@@ -199,24 +252,25 @@ Assets/
 │   ├── Gameplay/
 │   │   └── GameplayManagerBase.cs     # Shared MCQ loop + pause + quit confirm
 │   ├── Modes/
-│   │   ├── BootstrapManager.cs
-│   │   ├── MainMenuManager.cs         # Subject progress bars + badge strip
-│   │   ├── LevelSelectManager.cs      # 20 level tiles
+│   │   ├── BootstrapManager.cs        # POLISH: animated 📚 splash
+│   │   ├── MainMenuManager.cs         # POLISH: IconService gear / parent
+│   │   ├── LevelSelectManager.cs      # POLISH: star icons + lock sprite
 │   │   ├── ModeSelectManager.cs
-│   │   ├── LearnModeManager.cs        # 3 examples + 7 practice questions
+│   │   ├── LearnModeManager.cs        # POLISH: MascotHost + EmojiBurst
 │   │   ├── PracticeModeManager.cs
-│   │   ├── QuizModeManager.cs         # Timer-driven
-│   │   ├── StoryModeManager.cs        # Themed narrative banner
-│   │   ├── SpeedRoundManager.cs       # 50-pool, stop-on-first-wrong
-│   │   └── ResultsManager.cs          # Per-star pop animation + badges
+│   │   ├── QuizModeManager.cs         # POLISH: surprised reaction on time-up
+│   │   ├── StoryModeManager.cs
+│   │   ├── SpeedRoundManager.cs       # POLISH: surprised reaction on time-up
+│   │   └── ResultsManager.cs          # POLISH: trophy stamp + confetti rain
 │   ├── Editor/
 │   │   ├── DatabaseBuilderMenu.cs     # Fast single-asset build + Advanced submenu
+│   │   ├── PolishBuilderMenu.cs       # POLISH: builds UITheme + IconLibrary, wires avatars
 │   │   └── SceneBuilderMenu.cs
 │   ├── MathEdu.Runtime.asmdef
 │   └── Editor/MathEdu.Editor.asmdef
 ├── ScriptableObjects/                 # Optional per-grade asset files
 ├── Scenes/                            # Generated by the editor menu (13 scenes)
-├── Resources/                         # MathDatabase + AvatarLibrary (single assets)
+├── Resources/                         # MathDatabase + AvatarLibrary + UITheme + IconLibrary
 ├── Sprites/                           # UI/Backgrounds (Layer Lab + custom)
 └── Epic Toon FX/                      # vendor pack (optional)
 
@@ -257,9 +311,9 @@ L20 = three-step "challenge" at the grade's max range.
 
 | Mode | Behaviour |
 |---|---|
-| **Learn** | Guided lesson. Intro card → 3 auto‑reveal examples (each: show 1.5 s → highlight green + hint → 2.5 s pause → fade) → "Now it's YOUR turn!" → 7 practice questions with hints always visible. No scoring. |
+| **Learn** | Guided lesson. Intro card → 3 auto‑reveal examples (each: show 1.5 s → highlight green + hint → 2.5 s pause → fade) → "Now it's YOUR turn!" → 7 practice questions with hints always visible. MascotHost speaks throughout. No scoring. |
 | **Practice** | Untimed run through all 10 questions of the chosen level. Hints available. Mistakes don't penalise. |
-| **Quiz** | Timed challenge — `LevelData.quizSecondsPerQuestion` per question. Curve: **30 s → 10 s** across the 20 levels. Score = base + time bonus. No hints. |
+| **Quiz** | Timed challenge — `LevelData.quizSecondsPerQuestion` per question. Curve: **30 s → 10 s** across the 20 levels. Score = base + time bonus. No hints. Surprised reaction face on timer expiry. |
 | **Story** | Same MCQ loop as Practice, wrapped in a subject-themed narrative banner (Farmer Jenny / 🍕 pizza / Architect Aria / etc.). |
 | **Speed Round** | Rapid‑fire — `LevelData.speedSecondsPerQuestion` per question. Curve: **8 s → 2.5 s**. One wrong answer ends the run. Up to 50 questions per session. |
 
@@ -268,6 +322,8 @@ All five modes route to the same `Results` scene which:
   the scene transition, so Results survives backgrounding / scene reloads).
 - Animates 3 individual star widgets that pop 0 → 1.3 → 1.0 over 0.25 s
   with 0.15 s inter-star delay. Plays "starReveal" SFX per pop.
+- Fires a full-screen confetti rain on any win and a delayed badge sprinkle
+  when new badges are earned or 3 stars are scored.
 - Lists any newly earned badges with their pretty names + emoji.
 - Disables **Next Level** unless the player earned ≥ 1 star AND the next
   level was actually unlocked by this run.
@@ -306,6 +362,9 @@ header shows a 🏅 count.
    ├── ProgressManager      (records subject stats, awards badges)
    ├── UIManager            (scene transitions with fade + page-transition SFX)
    └── VFXManager           (Epic Toon FX hooks)
+
+[UIThemeService]            (Resources/UITheme.asset, drives panel/button/slider sprites)
+[IconService]               (Resources/IconLibrary.asset, drives named icons)
 ```
 
 - **Self‑bootstrapping singletons.** Every scene contains exactly **one**
@@ -320,6 +379,11 @@ header shows a 🏅 count.
 - **Theme‑aware factories.** `UIFactory` consults `UIThemeService` for
   every Sprite slot (buttons, panels, sliders, toggles, backgrounds). Drop
   in a `UITheme.asset` and the whole UI re‑skins automatically.
+- **Sprite-first / glyph-fallback icons.** `IconService.IconButton()` and
+  related helpers resolve named keys (`star`, `gear`, `emojiSmile`, …) to
+  sprites when an `IconLibrary.asset` is present; otherwise they fall back
+  to the emoji glyph supplied by the caller so every screen is always
+  recognisable.
 - **Procedural fallback content + audio.** If no `MathDatabase.asset` is
   present, `DatabaseBootstrapper.BuildInMemory()` constructs ~4,800
   questions at runtime. AudioManager generates pleasant SFX procedurally
@@ -339,31 +403,35 @@ header shows a 🏅 count.
 
 ```
 Bootstrap
-    │  (1.2 s splash)
+    │  (1.5 s animated splash with 📚 mark)
     │  if (!profile.setupComplete)
     ▼
-PlayerSetup ─────────────► Name + Avatar + Grade
+PlayerSetup ─────────────► Name + Avatar (with GUI Pro character art) + Grade
     │
     ▼ (Start Playing)
 MainMenu  ────────────────► Grade buttons (1, 2, 3)
                             Subject grid (per-grade) — progress bar +
                             "Level X / 20" / stars, or "Tap to start!"
                             ⚙ Settings  /  👪 Parental Dashboard
+                            (icons swap to GUI Pro pictoicons when wired)
     │
     ▼ (tap subject)
-LevelSelect ──────────────► 20 level tiles, unlocked tiles tappable,
-                            locked tiles show 🔒
+LevelSelect ──────────────► 20 level tiles, star icons w/ glow on unlocked,
+                            lock sprite on locked
     │
     ▼ (tap unlocked level)
 ModeSelect ───────────────► Learn / Practice / Quiz / Story / Speed
     │
     ▼ (tap mode)
 [Mode scene]  ────────────► MCQ loop with mode-specific rules
+                            ReactionFace puck reacts to every answer
+                            EmojiBurst on correct / streak / wrong
                             Pause button (top-right) freezes Time.timeScale
                             Back button asks "Quit this level?"
     │
     ▼ (last question or fail)
-Results ──────────────────► Stars + score + XP + badges
+Results ──────────────────► Trophy/sad stamp + animated stars w/ glow +
+                            confetti rain (on win) + badges + XP
                             Menu / Retry / Next (Next gated on unlock+stars)
 ```
 
@@ -378,14 +446,17 @@ The repository ships with a UI/Backgrounds sprite bundle (the
 `Assets/Sprites/UI/`) and a `backgrounds*` folder of backgrounds. To wire
 these into the entire UI in one step:
 
-1. **Create → MathEdu → UI Theme** in the Project window.
+1. **Create → MathEdu → UI Theme** in the Project window (or run
+   `MathEdu / Polish / Build Default UI Theme & Icon Library` to auto-wire
+   the GUI Pro pack).
 2. Drag your sprites into the matching slots on the new `UITheme.asset`.
 3. Move (or copy) the configured `UITheme.asset` into `Assets/Resources/`.
 4. Press Play — the entire UI now uses your artwork.
 
 If you don't want to wire a `UITheme`, the procedural defaults
-(`DefaultSprite.RoundedRect`, `Gradient`, `Circle`) keep every screen
-functional with zero artwork.
+(`DefaultSprite.RoundedRect`, `Gradient`, `Circle` + `PolishSprites.Star`,
+`Glow`, `ShadowedRoundedRect`) keep every screen functional with zero
+artwork.
 
 ---
 
@@ -411,10 +482,14 @@ no‑ops — gameplay is never blocked by missing VFX assets.
 
 | Menu | What it does | Typical duration |
 |---|---|---|
-| `MathEdu / Run Full Setup (DB + Avatars + Scenes)` | Runs the three primary builds in sequence with progress bars. The recommended one-click setup for a fresh clone. | < 60 s |
+| `MathEdu / Polish / ✨ Run Full Polish Setup` | Runs Quick Start **and** builds the UITheme.asset + IconLibrary.asset with GUI Pro sprites wired. **Recommended.** | < 60 s |
+| `MathEdu / ⚡ Quick Start (No DB Build — Recommended)` | Avatars + scenes only. Database is built in memory at startup. | < 30 s |
+| `MathEdu / Run Full Setup (writes DB asset — may be slow on low-RAM Macs)` | Also writes the DB asset on disk. | < 60 s typical, longer on constrained machines |
 | `MathEdu / Build All Scenes` | Creates **13** `.unity` scenes and registers them in Build Settings. | ~5 s |
-| `MathEdu / Build Default Database` | Generates the full curriculum as ONE consolidated `MathDatabase.asset` in `Assets/Resources/`, with every Grade / Subject / Level stored as a nested sub-asset. Browseable in the Project window via sub-asset foldout. | **3–10 s** |
+| `MathEdu / Build Default Database` | Generates the full curriculum as ONE consolidated `MathDatabase.asset` in `Assets/Resources/`. | **3–10 s** |
 | `MathEdu / Build Default Avatar Library` | 10 emoji avatars under `Assets/ScriptableObjects/Avatars/` + a Resources copy. | ~1 s |
+| `MathEdu / Polish / Build Default UI Theme & Icon Library` | Re-builds just the polish assets (theme + icons + avatar sprite wiring) — useful after dropping in new art. | ~3 s |
+| `MathEdu / Polish / Wipe Polish Assets` | Deletes `UITheme.asset` + `IconLibrary.asset`. | < 1 s |
 | `MathEdu / Wipe Generated Database` | Removes the generated folder + Resources copies. | < 1 s |
 | `MathEdu / Reset Player Progress` | Wipes the save file + PlayerPrefs. | < 1 s |
 
@@ -422,18 +497,15 @@ no‑ops — gameplay is never blocked by missing VFX assets.
 
 | Menu | What it does |
 |---|---|
-| `MathEdu / Advanced / Per-Grade Assets / Build Grade 1 Files` | Builds the Grade 1 subtree as **individual per-level `.asset` files** under `Assets/ScriptableObjects/Grades/Grade1/`. Properly batched. Independent and resumable. Choose this only if you want per-file version control or Inspector-level tuning of single levels. |
+| `MathEdu / Advanced / Per-Grade Assets / Build Grade 1 Files` | Builds the Grade 1 subtree as **individual per-level `.asset` files** under `Assets/ScriptableObjects/Grades/Grade1/`. Properly batched. Independent and resumable. |
 | `MathEdu / Advanced / Per-Grade Assets / Build Grade 2 Files` | Same as above for Grade 2. |
 | `MathEdu / Advanced / Per-Grade Assets / Build Grade 3 Files` | Same as above for Grade 3. |
-| `MathEdu / Advanced / Per-Grade Assets / Rebuild Master Index` | After building one or more grades via the per-file builders, this re-creates `MathDatabase.asset` (both the legacy `Assets/ScriptableObjects/` path and the `Assets/Resources/` copy) to point at the on-disk grade assets. |
-| `MathEdu / Advanced / Use Runtime Database Only (no build)` | Shows an in-Editor popup explaining that `GameManager.EnsureDatabase()` builds the database in memory at startup if no asset is present, so you don't need to materialize anything to play. |
-| `MathEdu / Advanced / Open Save File Location` | Reveals `Application.persistentDataPath` in Finder / Explorer. Useful for inspecting `player_profile.json`. |
+| `MathEdu / Advanced / Per-Grade Assets / Rebuild Master Index` | After building one or more grades via the per-file builders, this re-creates `MathDatabase.asset` to point at the on-disk grade assets. |
+| `MathEdu / Advanced / Use Runtime Database Only (no build)` | Shows an in-Editor popup explaining that `GameManager.EnsureDatabase()` builds the database in memory at startup if no asset is present. |
+| `MathEdu / Advanced / Open Save File Location` | Reveals `Application.persistentDataPath` in Finder / Explorer. |
 
 > **Performance note.** The default `Build Default Database` is the
-> consolidated single-asset path — fast, ~3–10 s. The `Advanced /
-> Per-Grade Assets` builders produce browseable per-level `.asset`
-> files; even those are now properly batched (~10–30 s per grade) and
-> resumable across Unity restarts. See
+> consolidated single-asset path — fast, ~3–10 s. See
 > [`Docs/RESCUE_FROM_DB_HANG.md`](Docs/RESCUE_FROM_DB_HANG.md) for the
 > full perf rationale and recovery if the editor previously hung on the
 > old un-batched build.
@@ -479,12 +551,12 @@ no‑ops — gameplay is never blocked by missing VFX assets.
 After cloning, run **one** menu item:
 
 ```
-MathEdu → Run Full Setup (DB + Avatars + Scenes)
+MathEdu → Polish → ✨ Run Full Polish Setup (scenes + theme + icons)
 ```
 
 Then open `Assets/Scenes/Bootstrap.unity` and press **▶ Play**.
 
-If you prefer running the three steps individually, see
+If you prefer running the steps individually, see
 [Quick start](#quick-start) Path B. If you only want to play (no
 materialized database asset needed), see Path C — the runtime fallback
 is fully featured.
