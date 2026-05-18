@@ -52,10 +52,6 @@ namespace MathEdu.Utility
                 try { val = string.Format(val, args); }
                 catch { /* malformed format string -> keep raw */ }
             }
-            // Run Arabic strings through the shaper so disconnected codepoints
-            // (U+0621..U+06FF) become proper connected presentation-form glyphs
-            // (U+FE70..U+FEFC) that TMP can render as a continuous word.
-            // The shaper is idempotent for already-shaped or non-Arabic strings.
             if (Current == Lang.Arabic && !string.IsNullOrEmpty(val))
                 val = ArabicShaper.Shape(val);
             return val;
@@ -124,8 +120,6 @@ namespace MathEdu.Utility
                             _arabicFont.name = "OS Arabic SDF (Runtime)";
                             Debug.LogWarning(
                                 "[Localization] Using OS dynamic font for Arabic. " +
-                                "Arabic glyphs may appear as squares on mobile because " +
-                                "TMP needs the actual TTF data. " +
                                 "Add a real TTF to Assets/Resources/Fonts/ to fix " +
                                 "(see Docs/ARABIC_FONT_SETUP.md).");
                             RegisterAsTmpFallback(_arabicFont);
@@ -143,10 +137,6 @@ namespace MathEdu.Utility
             }
         }
 
-        /// <summary>
-        /// Apply current language settings (font, RTL flag, polish) to a TMP
-        /// text component. Called automatically by UIFactory.CreateText.
-        /// </summary>
         public static void Apply(TMP_Text text)
         {
             if (text == null) return;
@@ -155,11 +145,6 @@ namespace MathEdu.Utility
                 var fa = ArabicFont;
                 if (fa != null) text.font = fa;
                 text.isRightToLeftText = true;
-                // Polish: Arabic glyphs are already shaped (connected) so we
-                // don't need extra character spacing — and a tiny negative
-                // tracking value gives a tighter, more natural look on phone
-                // screens. Line height a touch higher accommodates ascenders
-                // and descenders.
                 text.characterSpacing = -2f;
                 text.lineSpacing      = 5f;
             }
@@ -171,10 +156,6 @@ namespace MathEdu.Utility
             }
         }
 
-        // -------------------------------------------------------------------
-        // Internals
-        // -------------------------------------------------------------------
-
         private static void RegisterAsTmpFallback(TMP_FontAsset font)
         {
             if (font == null || _fallbackRegistered) return;
@@ -185,8 +166,7 @@ namespace MathEdu.Utility
                 if (!fallbacks.Contains(font))
                 {
                     fallbacks.Add(font);
-                    Debug.Log("[Localization] Registered " + font.name +
-                              " as TMP global fallback. All TMP texts can now render Arabic glyphs.");
+                    Debug.Log("[Localization] Registered " + font.name + " as TMP global fallback.");
                 }
                 _fallbackRegistered = true;
             }
@@ -199,13 +179,7 @@ namespace MathEdu.Utility
         public const string ArabicFontMissingMessage =
             "*** Arabic text will appear as SQUARE BOXES ***\n" +
             "No Arabic-capable TMP font asset found in Resources/Fonts/.\n\n" +
-            "QUICK FIX (one-time, ~1 minute):\n" +
-            "  1. Open https://fonts.google.com/noto/specimen/Noto+Sans+Arabic\n" +
-            "  2. Click 'Get font' > 'Download all' and unzip.\n" +
-            "  3. In Unity, create folder Assets/Resources/Fonts/ if needed.\n" +
-            "  4. Drag NotoSansArabic-Regular.ttf into that folder.\n" +
-            "  5. Stop and restart Play mode (or rebuild for Android/iOS).\n\n" +
-            "Or in the Unity menu: MathEdu > Localization > Open Arabic Font Setup Guide.\n" +
+            "QUICK FIX: Add NotoSansArabic-Regular.ttf to Assets/Resources/Fonts/.\n" +
             "See Docs/ARABIC_FONT_SETUP.md for full details.";
 
         private static readonly Dictionary<string, string> En = new Dictionary<string, string>
@@ -258,6 +232,8 @@ namespace MathEdu.Utility
             { "gp.correct", "Correct!" }, { "gp.great_job", "Great job!" },
             { "gp.you_got_it", "You got it!" }, { "gp.awesome", "Awesome!" },
             { "gp.brilliant", "Brilliant!" }, { "gp.yes_excl", "Yes!" },
+            { "gp.streak", "Streak!" }, { "gp.on_fire", "On fire!" },
+            { "gp.incredible", "Incredible!" }, { "gp.too_slow", "Too slow!" },
             { "gp.wrong_answer_was", "Answer was {0}" },
             { "gp.try_again", "Try again" }, { "gp.time_up", "Time's up!" },
             { "pause.paused", "Paused" }, { "pause.resume", "Resume" },
@@ -275,6 +251,13 @@ namespace MathEdu.Utility
             { "learn.done_sub", "Try Practice or Quiz mode next." },
             { "learn.back_to_modes", "Back to modes" },
             { "learn.practice_now", "Practice now" },
+            { "learn.host_welcome", "Welcome! Let's learn together." },
+            { "learn.host_youve_got_this", "You've got this!" },
+            { "learn.host_brilliant", "Brilliant work!" },
+            { "learn.host_try_again", "Try again - you can do it!" },
+            { "story.intro_default", "A new math adventure begins!" },
+            { "story.outro_default", "Wonderful work! The story continues..." },
+            { "story.moves_forward", "\u2728 The story moves forward..." },
             { "results.title_win", "Level Complete!" },
             { "results.title_lose", "Run Ended!" },
             { "results.correct_format", "Correct: {0} / {1}" },
@@ -407,6 +390,10 @@ namespace MathEdu.Utility
             { "gp.awesome", "\u0645\u0645\u062a\u0627\u0632!" },
             { "gp.brilliant", "\u0631\u0627\u0626\u0639!" },
             { "gp.yes_excl", "\u0646\u0639\u0645!" },
+            { "gp.streak", "\u0633\u0644\u0633\u0644\u0629!" },
+            { "gp.on_fire", "\u0645\u0634\u062a\u0639\u0644!" },
+            { "gp.incredible", "\u0645\u0630\u0647\u0644!" },
+            { "gp.too_slow", "\u0628\u0637\u064a\u0621 \u062c\u062f\u064b\u0627!" },
             { "gp.wrong_answer_was", "\u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0647\u064a {0}" },
             { "gp.try_again", "\u062d\u0627\u0648\u0644 \u0645\u0631\u0651\u0629 \u0623\u062e\u0631\u0649" },
             { "gp.time_up", "\u0627\u0646\u062a\u0647\u0649 \u0627\u0644\u0648\u0642\u062a!" },
@@ -428,6 +415,13 @@ namespace MathEdu.Utility
             { "learn.done_sub", "\u062c\u0631\u0651\u0628 \u0627\u0644\u062a\u062f\u0631\u064a\u0628 \u0623\u0648 \u0627\u0644\u0627\u062e\u062a\u0628\u0627\u0631 \u0628\u0639\u062f \u0630\u0644\u0643." },
             { "learn.back_to_modes", "\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0623\u0648\u0636\u0627\u0639" },
             { "learn.practice_now", "\u062a\u062f\u0631\u064a\u0628 \u0627\u0644\u0622\u0646" },
+            { "learn.host_welcome", "\u0645\u0631\u062d\u0628\u064b\u0627! \u0647\u064a\u0651\u0627 \u0646\u062a\u0639\u0644\u0651\u0645 \u0645\u0639\u064b\u0627." },
+            { "learn.host_youve_got_this", "\u062a\u0633\u062a\u0637\u064a\u0639 \u0630\u0644\u0643!" },
+            { "learn.host_brilliant", "\u0639\u0645\u0644 \u0631\u0627\u0626\u0639!" },
+            { "learn.host_try_again", "\u062d\u0627\u0648\u0644 \u0645\u0631\u0651\u0629 \u0623\u062e\u0631\u0649 - \u062a\u0633\u062a\u0637\u064a\u0639 \u0630\u0644\u0643!" },
+            { "story.intro_default", "\u062a\u0628\u062f\u0623 \u0645\u063a\u0627\u0645\u0631\u0629 \u0631\u064a\u0627\u0636\u064a\u0627\u062a \u062c\u062f\u064a\u062f\u0629!" },
+            { "story.outro_default", "\u0639\u0645\u0644 \u0631\u0627\u0626\u0639! \u062a\u0633\u062a\u0645\u0631\u0651 \u0627\u0644\u0642\u0635\u0651\u0629..." },
+            { "story.moves_forward", "\u2728 \u062a\u062a\u0642\u062f\u0651\u0645 \u0627\u0644\u0642\u0635\u0651\u0629..." },
             { "results.title_win", "\u062a\u0645\u0651 \u0625\u0643\u0645\u0627\u0644 \u0627\u0644\u0645\u0633\u062a\u0648\u0649!" },
             { "results.title_lose", "\u0627\u0646\u062a\u0647\u062a \u0627\u0644\u062c\u0648\u0644\u0629!" },
             { "results.correct_format", "\u0627\u0644\u0635\u062d\u064a\u062d: {0} / {1}" },
