@@ -47,6 +47,32 @@ namespace MathEdu.UI
         // -------------------------------------------------------------------
         public static (Canvas canvas, RectTransform safeArea) CreateCanvas(string name = "[UIRoot]")
         {
+            // -------- Camera --------
+            // ScreenSpaceOverlay canvas technically doesn't *need* a camera,
+            // but without one Unity prints "Display 1 No cameras rendering"
+            // as a watermark in the Game view, which scares developers and
+            // also leaves a sky-blue clear behind the UI. Spawn a minimal
+            // SolidColor camera once per scene so the backdrop is dark and
+            // the warning is gone.
+            if (Object.FindAnyObjectByType<Camera>() == null)
+            {
+                var camGo = new GameObject("[MainCamera]", typeof(Camera));
+                camGo.tag = "MainCamera";
+                var cam = camGo.GetComponent<Camera>();
+                cam.clearFlags     = CameraClearFlags.SolidColor;
+                cam.backgroundColor = new Color(0.10f, 0.13f, 0.20f);
+                cam.cullingMask    = 0; // render nothing — Canvas overlays on top
+                cam.orthographic   = true;
+                cam.nearClipPlane  = 0.1f;
+                cam.farClipPlane   = 100f;
+                cam.depth          = -100;
+                // AudioListener is required somewhere in the scene for AudioManager
+                // to play SFX in the editor; attach it to the same GameObject.
+                if (Object.FindAnyObjectByType<AudioListener>() == null)
+                    camGo.AddComponent<AudioListener>();
+            }
+
+            // -------- Canvas --------
             var canvasGo = new GameObject(name,
                 typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             var canvas = canvasGo.GetComponent<Canvas>();
@@ -58,12 +84,18 @@ namespace MathEdu.UI
             scaler.matchWidthOrHeight  = 0.5f;
             scaler.referencePixelsPerUnit = 100;
 
+            // -------- EventSystem --------
+            // StandaloneInputModule needs Active Input Handling = Old OR Both
+            // in Player Settings (see ProjectSettings/ProjectSettings.asset
+            // → activeInputHandler: 2). Without that the legacy Input class
+            // throws InvalidOperationException every frame.
             if (Object.FindAnyObjectByType<EventSystem>() == null)
             {
                 var es = new GameObject("[EventSystem]",
                     typeof(EventSystem), typeof(StandaloneInputModule));
             }
 
+            // -------- Safe area --------
             var safeAreaGo = new GameObject("SafeArea", typeof(RectTransform));
             var sa = safeAreaGo.GetComponent<RectTransform>();
             sa.SetParent(canvas.transform, false);
