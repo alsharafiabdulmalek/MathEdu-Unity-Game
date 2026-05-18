@@ -2,17 +2,16 @@
 // UIFactory.cs
 // -----------------------------------------------------------------------------
 // Utility helpers for building Canvas / TMP UI at runtime. Every screen in the
-// game constructs its widgets through these helpers, so we get:
+// game constructs its widgets through these helpers so we get:
 //   - One consistent visual style.
-//   - Zero hand-edited .unity YAML for layout - scenes only need a single
-//     [SceneBuilder] GameObject with the appropriate manager script.
+//   - Zero hand-edited .unity YAML for layout.
 //   - Safe-area-aware containers out of the box.
-//
-// When real sprite assets are dropped in, the helpers automatically pull the
-// matching sprite off the optional UITheme asset (via UIThemeService); a
-// procedural placeholder from DefaultSprite is used as the fallback.
+//   - Automatic i18n: every TMP text created here flows through
+//     Localization.Apply() so the Arabic font + RTL flag are applied in
+//     one place without each screen having to repeat itself.
 // -----------------------------------------------------------------------------
 
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -22,9 +21,6 @@ namespace MathEdu.UI
 {
     public static class UIFactory
     {
-        // -------------------------------------------------------------------
-        // Color palette (designer-tunable; UITheme can override)
-        // -------------------------------------------------------------------
         public static Color BgTop     => Themed(c => c.bgTop,    new Color(0.20f, 0.30f, 0.55f));
         public static Color BgBottom  => Themed(c => c.bgBottom, new Color(0.40f, 0.55f, 0.90f));
         public static readonly Color Panel     = new Color(1.00f, 1.00f, 1.00f, 0.95f);
@@ -42,18 +38,9 @@ namespace MathEdu.UI
             return (t != null && t.overrideColours) ? get(t) : def;
         }
 
-        // -------------------------------------------------------------------
-        // Root canvas with EventSystem and safe-area handling
-        // -------------------------------------------------------------------
         public static (Canvas canvas, RectTransform safeArea) CreateCanvas(string name = "[UIRoot]")
         {
             // -------- Camera --------
-            // ScreenSpaceOverlay canvas technically doesn't *need* a camera,
-            // but without one Unity prints "Display 1 No cameras rendering"
-            // as a watermark in the Game view, which scares developers and
-            // also leaves a sky-blue clear behind the UI. Spawn a minimal
-            // SolidColor camera once per scene so the backdrop is dark and
-            // the warning is gone.
             if (Object.FindAnyObjectByType<Camera>() == null)
             {
                 var camGo = new GameObject("[MainCamera]", typeof(Camera));
@@ -61,13 +48,11 @@ namespace MathEdu.UI
                 var cam = camGo.GetComponent<Camera>();
                 cam.clearFlags     = CameraClearFlags.SolidColor;
                 cam.backgroundColor = new Color(0.10f, 0.13f, 0.20f);
-                cam.cullingMask    = 0; // render nothing — Canvas overlays on top
+                cam.cullingMask    = 0;
                 cam.orthographic   = true;
                 cam.nearClipPlane  = 0.1f;
                 cam.farClipPlane   = 100f;
                 cam.depth          = -100;
-                // AudioListener is required somewhere in the scene for AudioManager
-                // to play SFX in the editor; attach it to the same GameObject.
                 if (Object.FindAnyObjectByType<AudioListener>() == null)
                     camGo.AddComponent<AudioListener>();
             }
@@ -84,18 +69,12 @@ namespace MathEdu.UI
             scaler.matchWidthOrHeight  = 0.5f;
             scaler.referencePixelsPerUnit = 100;
 
-            // -------- EventSystem --------
-            // StandaloneInputModule needs Active Input Handling = Old OR Both
-            // in Player Settings (see ProjectSettings/ProjectSettings.asset
-            // → activeInputHandler: 2). Without that the legacy Input class
-            // throws InvalidOperationException every frame.
             if (Object.FindAnyObjectByType<EventSystem>() == null)
             {
                 var es = new GameObject("[EventSystem]",
                     typeof(EventSystem), typeof(StandaloneInputModule));
             }
 
-            // -------- Safe area --------
             var safeAreaGo = new GameObject("SafeArea", typeof(RectTransform));
             var sa = safeAreaGo.GetComponent<RectTransform>();
             sa.SetParent(canvas.transform, false);
@@ -108,9 +87,6 @@ namespace MathEdu.UI
             return (canvas, sa);
         }
 
-        // -------------------------------------------------------------------
-        // Backgrounds
-        // -------------------------------------------------------------------
         public static Image CreateGradientBackground(RectTransform parent, Color top, Color bottom)
         {
             var go = new GameObject("Background", typeof(Image));
@@ -137,11 +113,6 @@ namespace MathEdu.UI
             return img;
         }
 
-        /// <summary>
-        /// Creates a background using a Sprite from the UITheme (key like
-        /// "menu", "play", "settings", "parental", "setup", "results"). Falls
-        /// back to a gradient if the theme has no sprite for that key.
-        /// </summary>
         public static Image CreateThemedBackground(RectTransform parent, string key)
         {
             var sprite = UIThemeService.BackgroundFor(key);
@@ -156,15 +127,11 @@ namespace MathEdu.UI
                 img.sprite = sprite;
                 img.type   = Image.Type.Simple;
                 img.raycastTarget  = false;
-                // Stretch to fill — children manage their own safe areas.
                 return img;
             }
             return CreateGradientBackground(parent, BgTop, BgBottom);
         }
 
-        // -------------------------------------------------------------------
-        // Panels and cards
-        // -------------------------------------------------------------------
         public static RectTransform CreatePanel(RectTransform parent, Vector2 anchorMin,
             Vector2 anchorMax, Color color, float cornerRadius = 16f, string name = "Panel")
         {
@@ -187,13 +154,9 @@ namespace MathEdu.UI
 
         public static RectTransform CreateCard(RectTransform parent, Color color, string name = "Card")
         {
-            var rt = CreatePanel(parent, new Vector2(0, 0), new Vector2(1, 1), color, 24, name);
-            return rt;
+            return CreatePanel(parent, new Vector2(0, 0), new Vector2(1, 1), color, 24, name);
         }
 
-        // -------------------------------------------------------------------
-        // Text (TextMeshProUGUI)
-        // -------------------------------------------------------------------
         public static TextMeshProUGUI CreateText(RectTransform parent, string text,
             int fontSize = 42, Color? color = null, TextAlignmentOptions align = TextAlignmentOptions.Center,
             string name = "Text")
@@ -213,12 +176,13 @@ namespace MathEdu.UI
             rt.anchorMax = Vector2.one;
             rt.offsetMin = new Vector2(16, 8);
             rt.offsetMax = new Vector2(-16, -8);
+
+            // i18n: swap font + RTL flag based on the current language.
+            // No-op when language is English.
+            Localization.Apply(tmp);
             return tmp;
         }
 
-        // -------------------------------------------------------------------
-        // Buttons
-        // -------------------------------------------------------------------
         public static Button CreateButton(RectTransform parent, string label,
             Color? bg = null, int fontSize = 48, string name = "Button")
         {
@@ -254,14 +218,6 @@ namespace MathEdu.UI
             return btn;
         }
 
-        // -------------------------------------------------------------------
-        // Inputs
-        // -------------------------------------------------------------------
-
-        /// <summary>
-        /// Build a TextMeshPro InputField. Returns the InputField so the caller
-        /// can hook onValueChanged / onSubmit.
-        /// </summary>
         public static TMP_InputField CreateInputField(RectTransform parent, string placeholder,
             int fontSize = 44, string name = "Input")
         {
@@ -279,7 +235,6 @@ namespace MathEdu.UI
 
             var input = go.GetComponent<TMP_InputField>();
 
-            // Text area
             var textArea = new GameObject("TextArea", typeof(RectTransform), typeof(RectMask2D));
             textArea.transform.SetParent(rt, false);
             var tar = (RectTransform)textArea.transform;
@@ -288,11 +243,15 @@ namespace MathEdu.UI
             tar.offsetMax = new Vector2(-24, -12);
 
             var placeholderTxt = CreateText(tar, placeholder, fontSize,
-                new Color(0.4f, 0.4f, 0.5f), TextAlignmentOptions.MidlineLeft, "Placeholder");
+                new Color(0.4f, 0.4f, 0.5f),
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Placeholder");
             placeholderTxt.fontStyle = FontStyles.Italic;
 
             var contentTxt = CreateText(tar, "", fontSize,
-                TextDark, TextAlignmentOptions.MidlineLeft, "Content");
+                TextDark,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Content");
 
             input.textViewport = tar;
             input.textComponent = contentTxt;
@@ -303,10 +262,6 @@ namespace MathEdu.UI
             return input;
         }
 
-        /// <summary>
-        /// Build a horizontal slider (0..1) with sprite-aware background, fill,
-        /// and handle. Returns the Slider component.
-        /// </summary>
         public static Slider CreateSlider(RectTransform parent, float initialValue = 0.5f,
             string name = "Slider")
         {
@@ -321,7 +276,6 @@ namespace MathEdu.UI
             slider.maxValue  = 1f;
             slider.wholeNumbers = false;
 
-            // Background
             var bg = new GameObject("Background", typeof(Image));
             bg.transform.SetParent(rt, false);
             var bgRt = (RectTransform)bg.transform;
@@ -333,7 +287,6 @@ namespace MathEdu.UI
             bgImg.sprite = UIThemeService.SliderBg();
             bgImg.type   = Image.Type.Sliced;
 
-            // Fill area & fill
             var fillArea = new GameObject("FillArea", typeof(RectTransform));
             fillArea.transform.SetParent(rt, false);
             var faRt = (RectTransform)fillArea.transform;
@@ -352,7 +305,6 @@ namespace MathEdu.UI
             fillImg.sprite = UIThemeService.SliderFill();
             fillImg.type   = Image.Type.Sliced;
 
-            // Handle slide area
             var handleArea = new GameObject("HandleSlideArea", typeof(RectTransform));
             handleArea.transform.SetParent(rt, false);
             var haRt = (RectTransform)handleArea.transform;
@@ -374,9 +326,6 @@ namespace MathEdu.UI
             return slider;
         }
 
-        // -------------------------------------------------------------------
-        // Layout helpers
-        // -------------------------------------------------------------------
         public static GameObject CreateVerticalLayout(RectTransform parent, float spacing = 24f,
             RectOffset padding = null, string name = "VLayout")
         {
@@ -467,9 +416,6 @@ namespace MathEdu.UI
             return sr;
         }
 
-        // -------------------------------------------------------------------
-        // Misc utilities
-        // -------------------------------------------------------------------
         public static void Stretch(RectTransform rt)
         {
             rt.anchorMin = Vector2.zero;
