@@ -7,23 +7,20 @@
 //
 // ====== LAZY BUILD (perf fix) =================================================
 //
-// BuildInMemory() now creates a *skeleton* database in well under 100 ms even
+// BuildInMemory() creates a *skeleton* database in well under 100 ms even
 // on a constrained MacBook Air: ~571 minimal ScriptableObject instances
 // (1 Database + 3 Grades + ~27 Subjects + 540 Levels) with only their
 // identity fields populated. Questions, lesson text, and story text are
 // generated lazily on first access via GameManager.CurrentLevel.
 //
-// Before this change, BuildInMemory() invoked QuestionGenerator.Generate()
-// 540 times up-front, generating 5,400 MathQuestion objects with strings and
-// arrays, which on a low-RAM machine could block the main thread for seconds.
+// ====== LOCALIZATION-AWARE REGENERATION =======================================
 //
-// The lazy fill happens when the player opens a level (Learn/Practice/Quiz/
-// Story/Speed), which costs ~1 ms per level — invisible to the user.
-//
-// All other consumers of the database (LevelSelect tiles, MainMenu subject
-// progress, ProgressManager star roll-ups) read level metadata only
-// (`levelNumber`, `levelId`, `displayTitle`) and don't touch `questions`,
-// so they are unaffected by the lazy fill.
+// All player-facing strings (questions, hints, lesson intros, story intros)
+// go through `QuestionStrings.*` which switches on `Localization.IsRTL` and
+// returns either English or Arabic text. So when the player flips Settings ->
+// Language, we need to invalidate every cached level so it gets regenerated
+// in the new language on next access. That's what
+// `ClearCachedLevelContent(db)` does. SettingsManager calls it.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -91,7 +88,7 @@ namespace MathEdu.Utility
 
         /// <summary>
         /// Lazily populate a LevelData with its questions, lesson text, and
-        /// story text. Idempotent — safe to call every time a level is shown.
+        /// story text. Idempotent - safe to call every time a level is shown.
         /// Cost per level: ~1 ms (10 question generations + a handful of
         /// string lookups). Called by GameManager.CurrentLevel.
         /// </summary>
@@ -115,15 +112,48 @@ namespace MathEdu.Utility
                 level.storyOutro = StoryOutro(subject);
         }
 
+        /// <summary>
+        /// Clear every level's cached question / lesson / story content
+        /// across the whole database so the next access regenerates them in
+        /// the currently-selected language. Called by SettingsManager when
+        /// the player switches between English and Arabic.
+        /// </summary>
+        public static void ClearCachedLevelContent(MathDatabase db)
+        {
+            if (db == null || db.grades == null) return;
+            foreach (var grade in db.grades)
+            {
+                if (grade == null || grade.subjects == null) continue;
+                foreach (var subj in grade.subjects)
+                {
+                    if (subj == null) continue;
+                    // Refresh SubjectData.displayName (used by some headers
+                    // that don't go through MainMenuManager.SubjectName).
+                    subj.displayName = QuestionGenerator.Pretty(subj.subject);
+                    if (subj.levels == null) continue;
+                    foreach (var lv in subj.levels)
+                    {
+                        if (lv == null) continue;
+                        if (lv.questions != null) lv.questions.Clear();
+                        lv.lessonIntro   = string.Empty;
+                        lv.lessonExample = string.Empty;
+                        lv.lessonTip     = string.Empty;
+                        lv.storyIntro    = string.Empty;
+                        lv.storyOutro    = string.Empty;
+                    }
+                }
+            }
+        }
+
         // -------------------------------------------------------------------
         // Timer curves (used by both the runtime fallback and the editor menu)
         // -------------------------------------------------------------------
 
-        /// <summary>20-level curve: 30s → 10s, smoother in the middle.</summary>
+        /// <summary>20-level curve: 30s -> 10s, smoother in the middle.</summary>
         public static float TimerForQuiz(int level) =>
             Mathf.Lerp(30f, 10f, Mathf.InverseLerp(1, 20, level));
 
-        /// <summary>20-level curve: 8s → 2.5s for Speed Round.</summary>
+        /// <summary>20-level curve: 8s -> 2.5s for Speed Round.</summary>
         public static float TimerForSpeed(int level) =>
             Mathf.Lerp(8f, 2.5f, Mathf.InverseLerp(1, 20, level));
 
@@ -157,93 +187,48 @@ namespace MathEdu.Utility
 
         public static string EmojiForSubject(MathSubject s) => s switch
         {
-            MathSubject.Counting       => "🔢",
-            MathSubject.Addition       => "➕",
-            MathSubject.Subtraction    => "➖",
-            MathSubject.Multiplication => "✖",
-            MathSubject.Division       => "➗",
-            MathSubject.Shapes         => "▲",
-            MathSubject.Patterns       => "◆◇",
-            MathSubject.Fractions      => "½",
-            MathSubject.Measurement    => "📏",
-            MathSubject.Time           => "🕒",
-            MathSubject.Money          => "💰",
+            MathSubject.Counting       => "\ud83d\udd22",
+            MathSubject.Addition       => "\u2795",
+            MathSubject.Subtraction    => "\u2796",
+            MathSubject.Multiplication => "\u2716",
+            MathSubject.Division       => "\u2797",
+            MathSubject.Shapes         => "\u25b2",
+            MathSubject.Patterns       => "\u25c6\u25c7",
+            MathSubject.Fractions      => "\u00bd",
+            MathSubject.Measurement    => "\ud83d\udccf",
+            MathSubject.Time           => "\ud83d\udd52",
+            MathSubject.Money          => "\ud83d\udcb0",
             _                          => "?"
         };
 
-        public static string GradeDescription(int g) => g switch
+        public static string GradeDescription(int g)
         {
-            1 => "Counting, simple addition & subtraction, shapes, and time.",
-            2 => "Skip counting, larger numbers, multiplication intro, fractions.",
-            3 => "Multi-digit math, tables, division, fractions and geometry.",
-            _ => ""
-        };
+            if (Localization.IsRTL)
+            {
+                return g switch
+                {
+                    1 => "\u0627\u0644\u0639\u062f\u0651\u060c \u0627\u0644\u062c\u0645\u0639 \u0648\u0627\u0644\u0637\u0631\u062d \u0627\u0644\u0628\u0633\u064a\u0637\u060c \u0627\u0644\u0623\u0634\u0643\u0627\u0644\u060c \u0648\u0627\u0644\u0648\u0642\u062a.",
+                    2 => "\u0627\u0644\u0639\u062f\u0651 \u0628\u0645\u0636\u0627\u0639\u0641\u0627\u062a\u060c \u0623\u0639\u062f\u0627\u062f \u0623\u0643\u0628\u0631\u060c \u0645\u0642\u062f\u0651\u0645\u0629 \u0627\u0644\u0636\u0631\u0628\u060c \u0627\u0644\u0643\u0633\u0648\u0631.",
+                    3 => "\u062d\u0633\u0627\u0628 \u0645\u062a\u0639\u062f\u0651\u062f \u0627\u0644\u0623\u0631\u0642\u0627\u0645\u060c \u062c\u062f\u0627\u0648\u0644 \u0627\u0644\u0636\u0631\u0628\u060c \u0627\u0644\u0642\u0633\u0645\u0629\u060c \u0627\u0644\u0643\u0633\u0648\u0631\u060c \u0648\u0627\u0644\u0647\u0646\u062f\u0633\u0629.",
+                    _ => ""
+                };
+            }
+            return g switch
+            {
+                1 => "Counting, simple addition & subtraction, shapes, and time.",
+                2 => "Skip counting, larger numbers, multiplication intro, fractions.",
+                3 => "Multi-digit math, tables, division, fractions and geometry.",
+                _ => ""
+            };
+        }
 
         // -------------------------------------------------------------------
         // Story templates (subject-themed)
         // -------------------------------------------------------------------
-        public static string StoryIntro(MathSubject s, int grade, int level)
-        {
-            int a = 1 + (level * 2);
-            int b = 1 + (level + grade);
-            switch (s)
-            {
-                case MathSubject.Addition:
-                    return $"🍎 Farmer Jenny has {a} apples. She picks {b} more. Help her count!";
-                case MathSubject.Subtraction:
-                    return $"🐦 {a + b} birds sat on a wire. {b} flew away. How many are left?";
-                case MathSubject.Multiplication:
-                    return $"🚗 There are {b} parking rows with {a} cars each. How many total?";
-                case MathSubject.Division:
-                    return $"🍕 You have {a * b} pizza slices to share equally with {b} friends.";
-                case MathSubject.Counting:
-                    return "🌟 The night sky is magical! Can you count all the stars?";
-                case MathSubject.Shapes:
-                    return "🏗️ Architect Aria is designing buildings. She needs your help!";
-                case MathSubject.Patterns:
-                    return "🎨 Artist Max is creating a pattern. Can you figure out what comes next?";
-                case MathSubject.Fractions:
-                    return "🎂 It's birthday time! Help slice the cake into equal pieces.";
-                case MathSubject.Measurement:
-                    return "📏 Builder Bob needs exact measurements. Can you help him?";
-                case MathSubject.Time:
-                    return "⏰ The train schedule needs your help! Read the clocks correctly.";
-                case MathSubject.Money:
-                    return "🏪 Welcome to Math Mart! Help the cashier make correct change.";
-                default:
-                    return $"A new math adventure begins at Level {level}!";
-            }
-        }
+        public static string StoryIntro(MathSubject s, int grade, int level) =>
+            QuestionStrings.StoryIntro(s, grade, level);
 
-        public static string StoryOutro(MathSubject s)
-        {
-            switch (s)
-            {
-                case MathSubject.Addition:
-                    return "Amazing! Jenny is so happy with your help counting her apples! 🎉";
-                case MathSubject.Subtraction:
-                    return "Wonderful! The birds are settled and you helped count them. 🐦";
-                case MathSubject.Multiplication:
-                    return "Brilliant! The parking lot is organized thanks to you. 🚗";
-                case MathSubject.Division:
-                    return "Yum! Everyone got an equal slice of pizza. 🍕";
-                case MathSubject.Counting:
-                    return "Look at all those stars you counted! ⭐";
-                case MathSubject.Shapes:
-                    return "Architect Aria thinks you're a natural builder. 🏗️";
-                case MathSubject.Patterns:
-                    return "Artist Max is impressed with your pattern eye. 🎨";
-                case MathSubject.Fractions:
-                    return "Everyone enjoyed their fair slice of cake. 🎂";
-                case MathSubject.Measurement:
-                    return "Builder Bob's project is perfect — great measuring! 📏";
-                case MathSubject.Time:
-                    return "Every train left on time, thanks to you. ⏰";
-                case MathSubject.Money:
-                    return "Every customer at Math Mart got the right change. 🏪";
-                default:
-                    return "Great job! The story continues…";
-            }
-        }
+        public static string StoryOutro(MathSubject s) =>
+            QuestionStrings.StoryOutro(s);
     }
 }
