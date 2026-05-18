@@ -97,6 +97,18 @@ namespace MathEdu.UI
             img.color  = Color.white;
             img.sprite = DefaultSprite.Gradient(top, bottom);
             img.raycastTarget = false;
+
+            // Polish: layer a soft radial glow on top to mimic post-processing
+            // bloom / vignette. Cheap (one extra Image) and totally optional —
+            // a UITheme background overrides this whole path anyway.
+            var glow = new GameObject("BgGlow", typeof(Image));
+            glow.transform.SetParent(rt, false);
+            var grt = glow.GetComponent<RectTransform>();
+            Stretch(grt);
+            var glowImg = glow.GetComponent<Image>();
+            glowImg.sprite = PolishSprites.Glow();
+            glowImg.color  = new Color(1f, 1f, 1f, 0.18f);
+            glowImg.raycastTarget = false;
             return img;
         }
 
