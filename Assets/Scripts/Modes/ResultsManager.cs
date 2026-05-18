@@ -1,26 +1,17 @@
 // -----------------------------------------------------------------------------
-// ResultsManager.cs
+// ResultsManager.cs (localized)
 // -----------------------------------------------------------------------------
-// End-of-level celebration screen. Reads its data exclusively from
-// GameSession.lastResult (populated by GameplayManagerBase.Finish before the
-// scene transition), so the screen renders identically whether the player
-// arrived from gameplay, backgrounded the app, or reloaded the scene.
-//
-// Visual behaviour (per spec):
-//   • Three star widgets start at scale 0.
-//   • 0.30 s after build: star #1 pops 0 → 1.3 → 1.0 over 0.25 s.
-//   • Inter-star delay 0.15 s before the next star animates.
-//   • Stars NOT earned remain at scale 0 (visible "empty" placeholder).
-//   • Plays "starReveal" SFX on each animated reveal.
-//   • Speed Round shows a "Survived X questions" caption instead of "Correct/Total".
-//   • "Next Level" enabled only when nextLevelUnlocked && stars > 0.
-//   • Empty-state error panel when GameSession.lastResult is missing.
+// End-of-level celebration. All strings flow through Localization.T() so the
+// player sees a fully Arabic results screen when language=ar, including
+// 'Level Complete!', 'Score X +Y XP', 'Correct: A / B', 'Survived N questions',
+// new-badge labels, action buttons, and the empty-state error panel.
 // -----------------------------------------------------------------------------
 
 using System.Collections;
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -59,11 +50,10 @@ namespace MathEdu.Modes
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
             UIFactory.CreateText((RectTransform)col.transform,
-                result.failedEarly ? "Run Ended!" : "Level Complete!",
+                Localization.T(result.failedEarly ? "results.title_lose" : "results.title_win"),
                 72, UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
-            // ---- Star row (three discrete star Images) ---------------------
             var starRow = new GameObject("StarRow",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             starRow.transform.SetParent(col.transform, false);
@@ -82,31 +72,29 @@ namespace MathEdu.Modes
             }
             StartCoroutine(AnimateStars(starWidgets, result.stars));
 
-            // ---- Body text -------------------------------------------------
             if (result.mode == LearningMode.SpeedRound)
             {
                 int survived = Mathf.Max(0, result.correct);
                 UIFactory.CreateText((RectTransform)col.transform,
-                    $"Survived {survived} questions!", 44,
+                    Localization.T("results.survived_format", survived), 44,
                     UIFactory.TextDark, TextAlignmentOptions.Center, "Survived")
                     .fontStyle = FontStyles.Bold;
                 UIFactory.CreateText((RectTransform)col.transform,
-                    $"Longest streak: {result.streak}", 32,
+                    Localization.T("results.streak_format", result.streak), 32,
                     UIFactory.TextDark, TextAlignmentOptions.Center, "Streak");
             }
             else
             {
                 UIFactory.CreateText((RectTransform)col.transform,
-                    $"Correct: {result.correct} / {result.total}", 40,
+                    Localization.T("results.correct_format", result.correct, result.total), 40,
                     UIFactory.TextDark, TextAlignmentOptions.Center, "Correct");
             }
 
             UIFactory.CreateText((RectTransform)col.transform,
-                $"Score {result.score}     +{result.xpEarned} XP",
+                Localization.T("results.score_xp_format", result.score, result.xpEarned),
                 40, UIFactory.Primary, TextAlignmentOptions.Center, "Score")
                 .fontStyle = FontStyles.Bold;
 
-            // ---- Newly earned badges --------------------------------------
             if (result.newBadges != null && result.newBadges.Length > 0)
             {
                 var badgePanel = UIFactory.CreatePanel((RectTransform)col.transform,
@@ -121,7 +109,7 @@ namespace MathEdu.Modes
                 bcrt.anchorMin = Vector2.zero; bcrt.anchorMax = Vector2.one;
                 bcrt.offsetMin = Vector2.zero; bcrt.offsetMax = Vector2.zero;
                 UIFactory.CreateText((RectTransform)bcol.transform,
-                    "🏅 New badge!", 36,
+                    Localization.T("results.new_badge_label"), 36,
                     UIFactory.TextDark, TextAlignmentOptions.Center, "BLbl")
                     .fontStyle = FontStyles.Bold;
                 foreach (var id in result.newBadges)
@@ -134,7 +122,6 @@ namespace MathEdu.Modes
                 HapticManager.Medium();
             }
 
-            // ---- Action row -----------------------------------------------
             var actions = new GameObject("Actions",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
             actions.transform.SetParent(col.transform, false);
@@ -144,7 +131,7 @@ namespace MathEdu.Modes
             hl.childForceExpandWidth = true;
             actions.GetComponent<LayoutElement>().preferredHeight = 160;
 
-            var menuBtn = UIFactory.CreateButton(arr, "Menu",
+            var menuBtn = UIFactory.CreateButton(arr, Localization.T("results.menu"),
                 new Color(0.5f, 0.5f, 0.6f), 40, "Menu");
             menuBtn.onClick.AddListener(() =>
             {
@@ -152,7 +139,7 @@ namespace MathEdu.Modes
                 GameManager.Instance.UI.Go(UIManager.SceneMainMenu);
             });
 
-            var retryBtn = UIFactory.CreateButton(arr, "Retry",
+            var retryBtn = UIFactory.CreateButton(arr, Localization.T("results.retry"),
                 UIFactory.Primary, 40, "Retry");
             retryBtn.onClick.AddListener(() =>
             {
@@ -160,7 +147,7 @@ namespace MathEdu.Modes
                 GameManager.Instance.UI.Go(SceneForMode(result.mode));
             });
 
-            var nextBtn = UIFactory.CreateButton(arr, "Next Level",
+            var nextBtn = UIFactory.CreateButton(arr, Localization.T("results.next_level"),
                 UIFactory.Success, 40, "Next");
             bool nextEnabled = result.nextLevelUnlocked && result.stars > 0;
             nextBtn.interactable = nextEnabled;
@@ -174,7 +161,6 @@ namespace MathEdu.Modes
                 GameManager.Instance.UI.Go(SceneForMode(result.mode));
             });
 
-            // ---- Audio + VFX celebration ----------------------------------
             if (result.stars > 0)
             {
                 GameManager.Instance.VFX?.PlayWin();
@@ -187,9 +173,6 @@ namespace MathEdu.Modes
             }
         }
 
-        // -------------------------------------------------------------------
-        // Star animation (one Image per slot, scale 0 → 1.3 → 1.0 in sequence)
-        // -------------------------------------------------------------------
         private RectTransform BuildStar(RectTransform parent, bool filled)
         {
             var go = new GameObject(filled ? "Star_filled" : "Star_empty",
@@ -206,14 +189,11 @@ namespace MathEdu.Modes
                 ? new Color(0.95f, 0.55f, 0.20f, 1f)
                 : new Color(0.7f, 0.7f, 0.7f, 0.35f);
 
-            // Five-pointed star glyph centred inside the circle.
             var glyph = UIFactory.CreateText(rt,
                 filled ? "★" : "☆", 130, Color.white,
                 TextAlignmentOptions.Center, "Glyph");
             glyph.fontStyle = FontStyles.Bold;
 
-            // Earned stars start invisible — we'll pop them in via coroutine.
-            // Empty stars stay at scale 1 so the player can see the gray slot.
             rt.localScale = filled ? Vector3.zero : Vector3.one;
             return rt;
         }
@@ -223,7 +203,7 @@ namespace MathEdu.Modes
             yield return new WaitForSeconds(0.30f);
             for (int i = 0; i < stars.Length; i++)
             {
-                if (i >= earned) yield break; // stop — unearned stars stay at scale 0
+                if (i >= earned) yield break;
                 yield return PopStar(stars[i]);
                 yield return new WaitForSeconds(0.15f);
             }
@@ -239,7 +219,6 @@ namespace MathEdu.Modes
             {
                 t += Time.unscaledDeltaTime;
                 float k = Mathf.Clamp01(t / dur);
-                // 0 → 1.3 over first 70%, then 1.3 → 1.0 over last 30%.
                 float s = k < 0.7f
                     ? Mathf.Lerp(0f, 1.3f, k / 0.7f)
                     : Mathf.Lerp(1.3f, 1.0f, (k - 0.7f) / 0.3f);
@@ -249,9 +228,6 @@ namespace MathEdu.Modes
             star.localScale = Vector3.one;
         }
 
-        // -------------------------------------------------------------------
-        // Helpers
-        // -------------------------------------------------------------------
         private string SceneForMode(LearningMode mode)
         {
             return mode switch
@@ -277,15 +253,15 @@ namespace MathEdu.Modes
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
             UIFactory.CreateText((RectTransform)col.transform,
-                "😅 Oops!", 84,
+                Localization.T("results.error_title"), 84,
                 UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
             UIFactory.CreateText((RectTransform)col.transform,
-                "We couldn't load this level's results.\nLet's head back to the menu.", 36,
+                Localization.T("results.error_body"), 36,
                 UIFactory.TextDark, TextAlignmentOptions.Center, "Body");
 
             var back = UIFactory.CreateButton((RectTransform)col.transform,
-                "Back to Menu", UIFactory.Primary, 40, "Back");
+                Localization.T("results.back_to_menu"), UIFactory.Primary, 40, "Back");
             back.gameObject.AddComponent<LayoutElement>().preferredHeight = 140;
             back.onClick.AddListener(() =>
             {
