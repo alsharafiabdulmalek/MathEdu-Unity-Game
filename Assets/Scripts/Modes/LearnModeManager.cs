@@ -13,6 +13,10 @@
 //
 // No scoring; finishing routes back to Mode Select. Designed as the gentlest
 // on-ramp to a new topic.
+//
+// Polish: a MascotHost lives in the bottom-left corner and talks the player
+// through the lesson, reacting happy/sad as they get answers right or wrong.
+// EmojiBurst fires on correct answers and at the wrap-up.
 // -----------------------------------------------------------------------------
 
 using System.Collections;
@@ -35,6 +39,7 @@ namespace MathEdu.Modes
         private TextMeshProUGUI _hintLabel;
         private RectTransform _answersHolder;
         private CanvasGroup _cardGroup;
+        private MascotHost _host;
 
         private const int ExampleCount = 3;
         private const int PracticeCount = 7;
@@ -64,7 +69,7 @@ namespace MathEdu.Modes
                 $"Learn - {GameManager.Instance.CurrentSubject?.displayName} L{_level.levelNumber}",
                 42, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
-            var back = UIFactory.CreateIconButton(header, "<", new Color(0, 0, 0, 0.3f), "Back");
+            var back = IconService.IconButton(header, "back", "<", new Color(0, 0, 0, 0.3f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
@@ -116,6 +121,13 @@ namespace MathEdu.Modes
             grid.padding = new RectOffset(24, 24, 24, 24);
             grid.childAlignment = TextAnchor.MiddleCenter;
             _answersHolder = answersPanel;
+
+            // Friendly host mascot lives in the bottom-left corner of the
+            // screen and "talks" the player through the lesson.
+            _host = MascotHost.Spawn(safe,
+                anchorMin: new Vector2(0.00f, 0.40f),
+                anchorMax: new Vector2(0.32f, 0.78f),
+                bodyTint: UIFactory.Accent);
         }
 
         // -------------------------------------------------------------------
@@ -127,6 +139,9 @@ namespace MathEdu.Modes
             _bodyLabel.text  = _level.lessonIntro;
             _hintLabel.text  = _level.lessonExample;
             ClearAnswers();
+
+            _host?.Speak("Welcome! Let's learn together.", 2.5f);
+            _host?.React(MascotHost.Mood.Happy);
 
             yield return new WaitForSeconds(2.5f);
 
@@ -145,6 +160,8 @@ namespace MathEdu.Modes
             _bodyLabel.text  = "Now it's YOUR turn! 💪";
             _hintLabel.text  = _level.lessonTip;
             ClearAnswers();
+            _host?.React(MascotHost.Mood.Cheer);
+            _host?.Speak("You've got this!", 1.6f);
             yield return new WaitForSeconds(1.5f);
 
             // 7 practice questions
@@ -162,6 +179,10 @@ namespace MathEdu.Modes
             _bodyLabel.text  = "Great job — you finished the lesson!";
             _hintLabel.text  = "Try Practice or Quiz mode next.";
             ClearAnswers();
+            _host?.React(MascotHost.Mood.Cheer);
+            _host?.Speak("Brilliant work!", 3.0f);
+            EmojiBurst.Cheer(_safeArea, new Vector2(_safeArea.rect.width * 0.5f,
+                                                    _safeArea.rect.height * 0.5f));
             AddCTA("Back to modes",
                 () => GameManager.Instance.UI.Go(UIManager.SceneModeSelect));
             AddCTA("Practice now", () =>
@@ -242,11 +263,17 @@ namespace MathEdu.Modes
                         img.color = UIFactory.Success;
                         GameManager.Instance.Audio.PlaySFX("correct");
                         HapticManager.Light();
+                        _host?.React(MascotHost.Mood.Happy);
+                        EmojiBurst.Correct(_safeArea,
+                            new Vector2(_safeArea.rect.width * 0.5f,
+                                        _safeArea.rect.height * 0.55f));
                     }
                     else
                     {
                         img.color = UIFactory.Danger;
                         GameManager.Instance.Audio.PlaySFX("wrong");
+                        _host?.React(MascotHost.Mood.Sad);
+                        _host?.Speak("Try again — you can do it!", 1.6f);
                     }
                 });
             }
