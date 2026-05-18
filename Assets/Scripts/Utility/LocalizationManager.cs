@@ -1,19 +1,10 @@
 // -----------------------------------------------------------------------------
-// LocalizationManager.cs (Arabic font auto-loading + TMP global fallback)
+// LocalizationManager.cs (Arabic font auto-loading + TMP global fallback +
+// runtime Arabic letter shaping)
 // -----------------------------------------------------------------------------
-// Same string tables, but the ArabicFont property now searches three sources
-// for a usable Arabic TTF and registers what it finds as a TMP global fallback
-// so every TMP text in the project can render Arabic glyphs.
-//
-// Square-box problem: TMP_FontAsset.CreateFontAsset(font) needs the actual
-// TTF byte data to build the SDF atlas. The font returned by
-// Font.CreateDynamicFontFromOSFont is just an OS handle, so on Android/iOS
-// TMP can't extract glyph outlines and every Arabic character falls back
-// to the tofu box.
-//
-// Fix: drop a real TTF into Assets/Resources/Fonts/ (see
-// Docs/ARABIC_FONT_SETUP.md for the one-minute walkthrough). The code below
-// auto-detects it.
+// Loads an Arabic-capable TMP font from Resources/Fonts/, registers it as the
+// TMP global fallback, and runs every Arabic string through ArabicShaper.Shape
+// so the letters render as connected cursive script (not isolated forms).
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -34,10 +25,6 @@ namespace MathEdu.Utility
 
         private static TMP_FontAsset _arabicFont;
         private static bool _fallbackRegistered;
-
-        // -------------------------------------------------------------------
-        // Public API
-        // -------------------------------------------------------------------
 
         public static void SetLanguage(Lang lang)
         {
@@ -65,6 +52,12 @@ namespace MathEdu.Utility
                 try { val = string.Format(val, args); }
                 catch { /* malformed format string -> keep raw */ }
             }
+            // Run Arabic strings through the shaper so disconnected codepoints
+            // (U+0621..U+06FF) become proper connected presentation-form glyphs
+            // (U+FE70..U+FEFC) that TMP can render as a continuous word.
+            // The shaper is idempotent for already-shaped or non-Arabic strings.
+            if (Current == Lang.Arabic && !string.IsNullOrEmpty(val))
+                val = ArabicShaper.Shape(val);
             return val;
         }
 
@@ -74,7 +67,6 @@ namespace MathEdu.Utility
             {
                 if (_arabicFont != null) return _arabicFont;
 
-                // Path 1: preauthored TMP_FontAsset (best quality)
                 _arabicFont = Resources.Load<TMP_FontAsset>("Fonts/Arabic SDF");
                 if (_arabicFont != null)
                 {
@@ -83,7 +75,6 @@ namespace MathEdu.Utility
                     return _arabicFont;
                 }
 
-                // Path 2: raw TTF in Resources/Fonts/, convert at runtime
                 string[] ttfNames = {
                     "Fonts/NotoSansArabic-Regular",
                     "Fonts/NotoSansArabic",
@@ -93,6 +84,8 @@ namespace MathEdu.Utility
                     "Fonts/Amiri",
                     "Fonts/NotoNaskhArabic-Regular",
                     "Fonts/NotoNaskhArabic",
+                    "Fonts/Tajawal-Regular",
+                    "Fonts/Tajawal",
                     "Fonts/Arabic"
                 };
                 foreach (var name in ttfNames)
@@ -116,7 +109,6 @@ namespace MathEdu.Utility
                     }
                 }
 
-                // Path 3: OS dynamic font (last resort - usually fails on mobile)
                 try
                 {
                     string[] osCandidates = {
@@ -151,6 +143,10 @@ namespace MathEdu.Utility
             }
         }
 
+        /// <summary>
+        /// Apply current language settings (font, RTL flag, polish) to a TMP
+        /// text component. Called automatically by UIFactory.CreateText.
+        /// </summary>
         public static void Apply(TMP_Text text)
         {
             if (text == null) return;
@@ -159,10 +155,19 @@ namespace MathEdu.Utility
                 var fa = ArabicFont;
                 if (fa != null) text.font = fa;
                 text.isRightToLeftText = true;
+                // Polish: Arabic glyphs are already shaped (connected) so we
+                // don't need extra character spacing — and a tiny negative
+                // tracking value gives a tighter, more natural look on phone
+                // screens. Line height a touch higher accommodates ascenders
+                // and descenders.
+                text.characterSpacing = -2f;
+                text.lineSpacing      = 5f;
             }
             else
             {
                 text.isRightToLeftText = false;
+                text.characterSpacing = 0f;
+                text.lineSpacing      = 0f;
             }
         }
 
@@ -175,11 +180,6 @@ namespace MathEdu.Utility
             if (font == null || _fallbackRegistered) return;
             try
             {
-                // TMP_Settings.fallbackFontAssets is a STATIC property
-                // (it forwards to TMP_Settings.instance.m_fallbackFontAssets
-                // internally), so it must be qualified with the type name,
-                // not an instance reference. Earlier versions of this code
-                // used `settings.fallbackFontAssets` which caused CS0176.
                 var fallbacks = TMP_Settings.fallbackFontAssets;
                 if (fallbacks == null) return;
                 if (!fallbacks.Contains(font))
