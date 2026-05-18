@@ -75,7 +75,8 @@ namespace MathEdu.Modes
             var buttons = _answersHolder.GetComponentsInChildren<AnswerButton>();
             if (q.correctIndex >= 0 && q.correctIndex < buttons.Length)
                 buttons[q.correctIndex].FlashCorrect();
-            _feedback.ShowWrong("Time's up!");
+            _feedback.ShowWrong("Time's up!", surprised: true);
+            if (_reactionFace != null) _reactionFace.Surprised();
             GameManager.Instance.VFX?.PlayWrong();
             StartCoroutine(AdvanceAfterDelay());
         }
