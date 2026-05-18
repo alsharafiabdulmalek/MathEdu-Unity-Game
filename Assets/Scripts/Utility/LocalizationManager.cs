@@ -1,29 +1,19 @@
 // -----------------------------------------------------------------------------
-// LocalizationManager.cs (with TTF-based Arabic font loading)
+// LocalizationManager.cs (Arabic font auto-loading + TMP global fallback)
 // -----------------------------------------------------------------------------
-// Lightweight i18n system for MathEdu. Currently ships:
-//   • English (en) — default
-//   • Arabic  (ar) — full UI with right-to-left text rendering + Arabic font
+// Same string tables, but the ArabicFont property now searches three sources
+// for a usable Arabic TTF and registers what it finds as a TMP global fallback
+// so every TMP text in the project can render Arabic glyphs.
 //
-// ====== FONT LOADING ORDER ===================================================
-// To render Arabic glyphs (not square boxes), TextMeshPro needs the actual
-// TTF/OTF data of an Arabic-capable font. We try three sources, in order:
+// Square-box problem: TMP_FontAsset.CreateFontAsset(font) needs the actual
+// TTF byte data to build the SDF atlas. The font returned by
+// Font.CreateDynamicFontFromOSFont is just an OS handle, so on Android/iOS
+// TMP can't extract glyph outlines and every Arabic character falls back
+// to the tofu box.
 //
-//   1. A pre-authored TMP_FontAsset at Resources/Fonts/Arabic SDF.asset
-//      (best quality - run Font Asset Creator on an Arabic TTF and save).
-//
-//   2. A raw TTF in Resources/Fonts/ named NotoSansArabic-Regular,
-//      Cairo-Regular, Amiri-Regular, or NotoNaskhArabic-Regular.
-//      The code creates a TMP_FontAsset from it at runtime.
-//      EASIEST USER SETUP: just drag the .ttf into Assets/Resources/Fonts/.
-//
-//   3. A dynamic OS font (last resort; on Android/iOS this can fail to
-//      render Arabic because TMP needs the actual TTF data, not an OS
-//      handle - if user sees square boxes they reached this path).
-//
-// When found, the Arabic font is ALSO registered into
-// TMP_Settings.fallbackFontAssets so even non-localized strings get
-// Arabic glyphs via the global TMP fallback chain.
+// Fix: drop a real TTF into Assets/Resources/Fonts/ (see
+// Docs/ARABIC_FONT_SETUP.md for the one-minute walkthrough). The code below
+// auto-detects it.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -78,14 +68,6 @@ namespace MathEdu.Utility
             return val;
         }
 
-        /// <summary>
-        /// Returns a TMP font asset that can render Arabic glyphs. Tries:
-        ///   1) preauthored Resources/Fonts/Arabic SDF.asset
-        ///   2) raw TTF in Resources/Fonts/ converted at runtime
-        ///   3) OS dynamic font (last resort - may not render on Android/iOS)
-        /// On success also registers as a global TMP fallback.
-        /// On failure logs a clear "how to fix" message.
-        /// </summary>
         public static TMP_FontAsset ArabicFont
         {
             get
@@ -134,7 +116,7 @@ namespace MathEdu.Utility
                     }
                 }
 
-                // Path 3: OS dynamic font (last resort)
+                // Path 3: OS dynamic font (last resort - usually fails on mobile)
                 try
                 {
                     string[] osCandidates = {
@@ -152,7 +134,8 @@ namespace MathEdu.Utility
                                 "[Localization] Using OS dynamic font for Arabic. " +
                                 "Arabic glyphs may appear as squares on mobile because " +
                                 "TMP needs the actual TTF data. " +
-                                "Add a real TTF to Assets/Resources/Fonts/ to fix.");
+                                "Add a real TTF to Assets/Resources/Fonts/ to fix " +
+                                "(see Docs/ARABIC_FONT_SETUP.md).");
                             RegisterAsTmpFallback(_arabicFont);
                             return _arabicFont;
                         }
@@ -168,7 +151,6 @@ namespace MathEdu.Utility
             }
         }
 
-        /// <summary>Apply current language settings (font + RTL) to a TMP text component.</summary>
         public static void Apply(TMP_Text text)
         {
             if (text == null) return;
@@ -220,12 +202,9 @@ namespace MathEdu.Utility
             "  3. In Unity, create folder Assets/Resources/Fonts/ if needed.\n" +
             "  4. Drag NotoSansArabic-Regular.ttf into that folder.\n" +
             "  5. Stop and restart Play mode (or rebuild for Android/iOS).\n\n" +
-            "Code auto-detects the TTF and creates a TMP font asset at runtime.\n" +
+            "Or in the Unity menu: MathEdu > Localization > Open Arabic Font Setup Guide.\n" +
             "See Docs/ARABIC_FONT_SETUP.md for full details.";
 
-        // -------------------------------------------------------------------
-        //                   ENGLISH (default fallback table)
-        // -------------------------------------------------------------------
         private static readonly Dictionary<string, string> En = new Dictionary<string, string>
         {
             { "common.ok", "OK" }, { "common.cancel", "Cancel" }, { "common.back", "Back" },
@@ -358,9 +337,6 @@ namespace MathEdu.Utility
             { "badge.master_fmt", "\ud83c\udfc6 {0} Master (G{1})" },
         };
 
-        // -------------------------------------------------------------------
-        //                          ARABIC
-        // -------------------------------------------------------------------
         private static readonly Dictionary<string, string> Ar = new Dictionary<string, string>
         {
             { "common.ok", "\u0645\u0648\u0627\u0641\u0642" },
@@ -518,7 +494,7 @@ namespace MathEdu.Utility
             { "badge.early_bird", "\ud83c\udf05 \u0627\u0644\u0641\u062c\u0631 \u0627\u0644\u0645\u0628\u0643\u0651\u0631" },
             { "badge.dedicated", "\ud83d\udcc5 \u0645\u0644\u062a\u0632\u0645" },
             { "badge.apprentice_fmt", "\ud83c\udf93 \u0645\u062a\u062f\u0631\u0651\u0628 {0} (\u0627\u0644\u0635\u0641 {1})" },
-            { "badge.master_fmt", "\ud83c\udfc6 \u062e\u0628\u064a\r {0} (\u0627\u0644\u0635\u0641 {1})" },
+            { "badge.master_fmt", "\ud83c\udfc6 \u062e\u0628\u064a\u0631 {0} (\u0627\u0644\u0635\u0641 {1})" },
         };
     }
 }
