@@ -175,9 +175,12 @@ namespace MathEdu.Utility
             if (font == null || _fallbackRegistered) return;
             try
             {
-                var settings = TMP_Settings.instance;
-                if (settings == null) return;
-                var fallbacks = settings.fallbackFontAssets;
+                // TMP_Settings.fallbackFontAssets is a STATIC property
+                // (it forwards to TMP_Settings.instance.m_fallbackFontAssets
+                // internally), so it must be qualified with the type name,
+                // not an instance reference. Earlier versions of this code
+                // used `settings.fallbackFontAssets` which caused CS0176.
+                var fallbacks = TMP_Settings.fallbackFontAssets;
                 if (fallbacks == null) return;
                 if (!fallbacks.Contains(font))
                 {
