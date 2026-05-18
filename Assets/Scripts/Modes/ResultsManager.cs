@@ -49,10 +49,47 @@ namespace MathEdu.Modes
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform,
+            // Big iconified title with a sprite stamp on the left.
+            var titleRow = new GameObject("TitleRow",
+                typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            titleRow.transform.SetParent(col.transform, false);
+            var thl = titleRow.GetComponent<HorizontalLayoutGroup>();
+            thl.spacing = 16;
+            thl.childAlignment = TextAnchor.MiddleCenter;
+            thl.childForceExpandWidth = false;
+            titleRow.GetComponent<LayoutElement>().preferredHeight = 130;
+
+            // Icon stamp — trophy on win, sad face on lose, sprite-or-glyph.
+            bool isWin = !result.failedEarly && result.stars > 0;
+            string iconKey = isWin ? "trophy" : "sad";
+            string iconGlyph = isWin ? "🏆" : "😟";
+
+            var icoSprite = IconService.Get(iconKey);
+            if (icoSprite != null)
+            {
+                var ico = new GameObject("Icon", typeof(Image), typeof(LayoutElement));
+                ico.transform.SetParent(titleRow.transform, false);
+                var img = ico.GetComponent<Image>();
+                img.sprite = icoSprite;
+                img.preserveAspect = true;
+                img.color = isWin ? new Color(1.00f, 0.78f, 0.20f) : new Color(0.85f, 0.5f, 0.5f);
+                img.raycastTarget = false;
+                var le = ico.GetComponent<LayoutElement>();
+                le.preferredWidth = 110; le.preferredHeight = 110;
+            }
+            else
+            {
+                var glyph = UIFactory.CreateText((RectTransform)titleRow.transform,
+                    iconGlyph, 100, UIFactory.TextDark, TextAlignmentOptions.Center, "Glyph");
+                var le = glyph.gameObject.AddComponent<LayoutElement>();
+                le.preferredWidth = 110;
+            }
+
+            var titleTxt = UIFactory.CreateText((RectTransform)titleRow.transform,
                 Localization.T(result.failedEarly ? "results.title_lose" : "results.title_win"),
-                72, UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
-                .fontStyle = FontStyles.Bold;
+                72, UIFactory.TextDark, TextAlignmentOptions.Center, "Title");
+            titleTxt.fontStyle = FontStyles.Bold;
+            titleTxt.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
 
             var starRow = new GameObject("StarRow",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
@@ -165,34 +202,74 @@ namespace MathEdu.Modes
             {
                 GameManager.Instance.VFX?.PlayWin();
                 HapticManager.Medium();
+                // Confetti shower on top of the entire safe area for ~2.4s.
+                EmojiBurst.Win(safe);
+                // A 3-star result deserves an extra puff of stars after the
+                // star pop animation finishes (~0.9s into the sequence).
+                if (result.stars >= 3) StartCoroutine(DelayedBadgeBurst(safe));
             }
             else
             {
                 GameManager.Instance.Audio.PlaySFX("lose");
                 GameManager.Instance.VFX?.PlayLose();
             }
+
+            // If new badges were earned, fire a celebratory burst when the
+            // badge panel is laid out.
+            if (result.newBadges != null && result.newBadges.Length > 0)
+            {
+                StartCoroutine(DelayedBadgeBurst(safe));
+            }
+        }
+
+        private IEnumerator DelayedBadgeBurst(RectTransform safe)
+        {
+            yield return new WaitForSeconds(1.2f);
+            float w = safe.rect.width;
+            float h = safe.rect.height;
+            EmojiBurst.Badge(safe, new Vector2(w * 0.5f, h * 0.65f));
         }
 
         private RectTransform BuildStar(RectTransform parent, bool filled)
         {
             var go = new GameObject(filled ? "Star_filled" : "Star_empty",
-                typeof(RectTransform), typeof(Image), typeof(LayoutElement));
+                typeof(RectTransform), typeof(LayoutElement));
             go.transform.SetParent(parent, false);
             var rt = (RectTransform)go.transform;
-            rt.sizeDelta = new Vector2(180, 180);
-            go.GetComponent<LayoutElement>().preferredWidth = 180;
-            go.GetComponent<LayoutElement>().preferredHeight = 180;
+            rt.sizeDelta = new Vector2(200, 200);
+            go.GetComponent<LayoutElement>().preferredWidth = 200;
+            go.GetComponent<LayoutElement>().preferredHeight = 200;
 
-            var img = go.GetComponent<Image>();
-            img.sprite = DefaultSprite.Circle();
-            img.color  = filled
-                ? new Color(0.95f, 0.55f, 0.20f, 1f)
-                : new Color(0.7f, 0.7f, 0.7f, 0.35f);
+            // Layer 1: soft glow halo (filled stars only)
+            if (filled)
+            {
+                var glow = new GameObject("Glow", typeof(Image));
+                glow.transform.SetParent(rt, false);
+                var grt = (RectTransform)glow.transform;
+                grt.anchorMin = Vector2.zero; grt.anchorMax = Vector2.one;
+                grt.offsetMin = new Vector2(-40, -40);
+                grt.offsetMax = new Vector2(40, 40);
+                var gImg = glow.GetComponent<Image>();
+                gImg.sprite = PolishSprites.Glow();
+                gImg.color  = new Color(1.0f, 0.85f, 0.30f, 0.55f);
+                gImg.raycastTarget = false;
+            }
 
-            var glyph = UIFactory.CreateText(rt,
-                filled ? "★" : "☆", 130, Color.white,
-                TextAlignmentOptions.Center, "Glyph");
-            glyph.fontStyle = FontStyles.Bold;
+            // Layer 2: the star shape itself — prefer a real sprite, fall
+            // back to the procedural 5-point star.
+            var starGo = new GameObject("Star", typeof(Image));
+            starGo.transform.SetParent(rt, false);
+            var srt = (RectTransform)starGo.transform;
+            srt.anchorMin = Vector2.zero; srt.anchorMax = Vector2.one;
+            srt.offsetMin = Vector2.zero; srt.offsetMax = Vector2.zero;
+            var sImg = starGo.GetComponent<Image>();
+            var sprite = IconService.Get("star");
+            sImg.sprite = sprite != null ? sprite : PolishSprites.Star();
+            sImg.preserveAspect = true;
+            sImg.color = filled
+                ? new Color(1.00f, 0.78f, 0.20f, 1f)
+                : new Color(0.65f, 0.65f, 0.65f, 0.45f);
+            sImg.raycastTarget = false;
 
             rt.localScale = filled ? Vector3.zero : Vector3.one;
             return rt;
