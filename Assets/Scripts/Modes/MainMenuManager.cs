@@ -162,12 +162,15 @@ namespace MathEdu.Modes
                 Localization.T("menu.continue"), UIFactory.Success, 48, "ContinueBtn");
             continueBtn.onClick.AddListener(OnContinue);
 
-            var settingsBtn = UIFactory.CreateIconButton((RectTransform)hLayout.transform,
-                "⚙", new Color(0.30f, 0.35f, 0.45f), "SettingsBtn");
+            // Settings & Parental Dashboard entry points — try a real GUI Pro
+            // icon first, fall back to a unicode glyph so the buttons are
+            // always recognisable even without the polish assets built.
+            var settingsBtn = IconService.IconButton((RectTransform)hLayout.transform,
+                "gear", "⚙", new Color(0.30f, 0.35f, 0.45f), "SettingsBtn");
             settingsBtn.onClick.AddListener(OnSettings);
 
-            var parentBtn = UIFactory.CreateIconButton((RectTransform)hLayout.transform,
-                "👪", new Color(0.50f, 0.30f, 0.55f), "ParentBtn");
+            var parentBtn = IconService.IconButton((RectTransform)hLayout.transform,
+                "parent", "👪", new Color(0.50f, 0.30f, 0.55f), "ParentBtn");
             parentBtn.onClick.AddListener(OnParent);
         }
 
