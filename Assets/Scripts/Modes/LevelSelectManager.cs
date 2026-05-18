@@ -44,7 +44,7 @@ namespace MathEdu.Modes
                 56, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
-            var back = UIFactory.CreateIconButton(header, "<", new Color(0, 0, 0, 0.35f), "Back");
+            var back = IconService.IconButton(header, "back", "<", new Color(0, 0, 0, 0.35f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
@@ -113,12 +113,14 @@ namespace MathEdu.Modes
                 unlocked ? UIFactory.TextDark : new Color(1, 1, 1, 0.85f),
                 TextAlignmentOptions.Center, "Title");
 
-            UIFactory.CreateText((RectTransform)col.transform,
-                unlocked ? RenderStars(stars) : "🔒",
-                64,
-                unlocked ? UIFactory.Accent : Color.white,
-                TextAlignmentOptions.Center, "Stars")
-                .fontStyle = FontStyles.Bold;
+            if (unlocked)
+            {
+                BuildStarRow((RectTransform)col.transform, stars);
+            }
+            else
+            {
+                BuildLockBadge((RectTransform)col.transform);
+            }
 
             if (unlocked)
             {
@@ -142,6 +144,66 @@ namespace MathEdu.Modes
             string s = "";
             for (int i = 0; i < 3; i++) s += i < stars ? "★" : "☆";
             return s;
+        }
+
+        /// <summary>
+        /// Render a row of three star icons, filled or hollow according to
+        /// <paramref name="stars"/>. Uses the IconLibrary's star sprite if
+        /// available, otherwise the procedural PolishSprites.Star.
+        /// </summary>
+        private static void BuildStarRow(RectTransform parent, int stars)
+        {
+            var row = new GameObject("Stars",
+                typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));
+            row.transform.SetParent(parent, false);
+            var hl = row.GetComponent<HorizontalLayoutGroup>();
+            hl.spacing = 8; hl.childAlignment = TextAnchor.MiddleCenter;
+            hl.childForceExpandWidth = false; hl.childForceExpandHeight = true;
+            row.GetComponent<LayoutElement>().preferredHeight = 72;
+
+            var sprite = IconService.Get("star");
+            for (int i = 0; i < 3; i++)
+            {
+                bool filled = i < stars;
+                var go = new GameObject($"S_{i}", typeof(Image), typeof(LayoutElement));
+                go.transform.SetParent(row.transform, false);
+                var img = go.GetComponent<Image>();
+                img.sprite = sprite != null ? sprite : PolishSprites.Star();
+                img.preserveAspect = true;
+                img.color = filled
+                    ? new Color(1.00f, 0.78f, 0.20f, 1f)
+                    : new Color(0.60f, 0.60f, 0.60f, 0.40f);
+                img.raycastTarget = false;
+                var le = go.GetComponent<LayoutElement>();
+                le.preferredWidth = 60; le.preferredHeight = 60;
+            }
+        }
+
+        private static void BuildLockBadge(RectTransform parent)
+        {
+            var sprite = IconService.Get("lock");
+            var go = new GameObject("Lock", typeof(LayoutElement));
+            go.transform.SetParent(parent, false);
+            go.GetComponent<LayoutElement>().preferredHeight = 80;
+
+            if (sprite != null)
+            {
+                var imgGo = new GameObject("LockIcon", typeof(Image));
+                imgGo.transform.SetParent(go.transform, false);
+                var rt = (RectTransform)imgGo.transform;
+                rt.anchorMin = new Vector2(0.30f, 0); rt.anchorMax = new Vector2(0.70f, 1);
+                rt.offsetMin = Vector2.zero; rt.offsetMax = Vector2.zero;
+                var img = imgGo.GetComponent<Image>();
+                img.sprite = sprite;
+                img.color  = Color.white;
+                img.preserveAspect = true;
+                img.raycastTarget = false;
+            }
+            else
+            {
+                UIFactory.CreateText((RectTransform)go.transform, "🔒", 70, Color.white,
+                    TextAlignmentOptions.Center, "Glyph").fontStyle = FontStyles.Bold;
+            }
         }
     }
 }
