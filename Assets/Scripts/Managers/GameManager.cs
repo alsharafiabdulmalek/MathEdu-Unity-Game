@@ -6,22 +6,7 @@
 // VFX). Auto-creates itself the first time anyone calls GameManager.Instance
 // so scenes can be played standalone in the editor.
 //
-// Standalone-scene safety:
-//   • If a scene is opened directly without going through Bootstrap, the
-//     first call to GameManager.Instance lazily creates the singleton,
-//     loads the saved profile (or builds a default), and registers
-//     fallback Subject/Grade/Level selections so the gameplay managers
-//     never crash on null lookups.
-//   • Every helper property (CurrentLevel/Subject/Grade) returns null only
-//     when the database itself is missing; callers always handle null.
-//
-// Lazy database fill:
-//   • When the in-memory database (DatabaseBootstrapper.BuildInMemory) is in
-//     use, levels are created as skeletons. CurrentLevel populates each
-//     level's questions / lesson text / story text on first access via
-//     DatabaseBootstrapper.EnsureLevelContent(). This keeps Bootstrap.unity
-//     instant on constrained machines and spreads the question-generation
-//     cost over the course of normal play.
+// Lazy database fill, standalone-scene safety, and i18n init all live here.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -46,14 +31,12 @@ namespace MathEdu.Managers
                     {
                         var go = new GameObject("[GameManager]");
                         _instance = go.AddComponent<GameManager>();
-                        // Awake handles DontDestroyOnLoad + child managers.
                     }
                 }
                 return _instance;
             }
         }
 
-        // ------------------------------------------------------ state ------
         [Header("Master Data (optional, auto-built if null)")]
         public MathDatabase   database;
         public AvatarLibrary  avatarLibrary;
@@ -69,7 +52,6 @@ namespace MathEdu.Managers
 
         private bool _initialized;
 
-        // ------------------------------------------------------ lifecycle --
         private void Awake()
         {
             if (_instance != null && _instance != this)
@@ -92,9 +74,11 @@ namespace MathEdu.Managers
 
             Profile = SaveSystem.Load() ?? new PlayerProfile();
 
-            // Initialise sensible defaults on a brand-new profile so the
-            // gameplay scenes can run standalone without going through
-            // PlayerSetup → MainMenu first.
+            // i18n: apply the persisted language as soon as the profile is
+            // loaded so the very first UI string the player sees is already
+            // in their chosen language.
+            Localization.SetFromCode(Profile.language);
+
             if (Profile.selectedGrade <= 0) Profile.selectedGrade = 1;
             if (Session == null) Session = new GameSession();
             Session.selectedGrade   = Profile.selectedGrade;
@@ -108,7 +92,6 @@ namespace MathEdu.Managers
 
             UnlockStartingLevels();
 
-            // Composite managers (added once per GameManager instance).
             Audio    = gameObject.AddComponent<AudioManager>();
             Progress = gameObject.AddComponent<ProgressManager>();
             UI       = gameObject.AddComponent<UIManager>();
@@ -128,13 +111,11 @@ namespace MathEdu.Managers
             if (Profile != null) SaveSystem.Save(Profile);
         }
 
-        // ------------------------------------------------------ helpers ----
         private void EnsureDatabase()
         {
             if (database != null && database.grades != null && database.grades.Count > 0)
                 return;
 
-            // Try Resources first so a build-time asset wins.
             var fromResources = Resources.Load<MathDatabase>("MathDatabase");
             if (fromResources != null && fromResources.grades != null
                 && fromResources.grades.Count > 0)
@@ -143,12 +124,8 @@ namespace MathEdu.Managers
                 return;
             }
 
-            // Fallback: procedural runtime database — skeleton only, levels
-            // are filled with questions / text lazily on first access via
-            // CurrentLevel below. Cost here: < 100 ms even on a low-RAM Mac.
             database = DatabaseBootstrapper.BuildInMemory();
-            Debug.Log("[GameManager] Built runtime MathDatabase (lazy skeleton — " +
-                      "questions generated on demand).");
+            Debug.Log("[GameManager] Built runtime MathDatabase (lazy skeleton).");
         }
 
         private void EnsureAvatarLibrary()
@@ -186,7 +163,6 @@ namespace MathEdu.Managers
             SaveSystem.Save(Profile);
         }
 
-        // ------------------------------------------------------ API --------
         public void SelectGrade(int g)
         {
             Session.selectedGrade = g;
@@ -196,13 +172,6 @@ namespace MathEdu.Managers
         public void SelectLevel(int l)        { Session.selectedLevel = l; }
         public void SelectMode(LearningMode m){ Session.selectedMode = m; }
 
-        /// <summary>
-        /// Returns the currently selected LevelData, populating its
-        /// questions / lesson text / story text on first access via the
-        /// lazy DatabaseBootstrapper.EnsureLevelContent() helper. Reading
-        /// CurrentLevel from the same level multiple times is cheap — the
-        /// second hit is a single null/empty check.
-        /// </summary>
         public LevelData CurrentLevel
         {
             get

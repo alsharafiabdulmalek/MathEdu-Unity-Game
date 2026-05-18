@@ -1,13 +1,14 @@
 // -----------------------------------------------------------------------------
-// ModeSelectManager.cs
+// ModeSelectManager.cs (localized)
 // -----------------------------------------------------------------------------
-// Lets the player pick one of the five learning modes for the currently
-// selected level: Learn, Practice, Quiz, Story, Speed Round.
+// Mode picker (Learn / Practice / Quiz / Story / Speed Round). All visible
+// strings use Localization.T() so the screen renders in the current language.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,7 +36,10 @@ namespace MathEdu.Modes
                 subject != null ? subject.themeColor : UIFactory.Primary, 0, "Header");
 
             UIFactory.CreateText(header,
-                $"Grade {grade?.gradeNumber} • {subject?.displayName} • Level {level?.levelNumber}",
+                Localization.T("modesel.title",
+                    grade?.gradeNumber ?? 1,
+                    subject != null ? MainMenuManager.SubjectName(subject.subject) : "",
+                    level?.levelNumber ?? 1),
                 40, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
@@ -60,11 +64,11 @@ namespace MathEdu.Modes
             v.childForceExpandWidth = true;
             v.childAlignment = TextAnchor.MiddleCenter;
 
-            AddMode(listHolder, "Learn",      "Step-by-step lesson with an example.",   LearningMode.Learn,      UIFactory.Primary);
-            AddMode(listHolder, "Practice",   "Untimed multiple choice. Take your time.",LearningMode.Practice,   UIFactory.Success);
-            AddMode(listHolder, "Quiz",       "Timed challenge. Score = correct + speed.",LearningMode.Quiz,      UIFactory.Accent);
-            AddMode(listHolder, "Story",      "Math adventure with characters.",         LearningMode.Story,      new Color(0.55f, 0.40f, 0.90f));
-            AddMode(listHolder, "Speed Round","Fast-fire questions. How many in a row?", LearningMode.SpeedRound, UIFactory.Danger);
+            AddMode(listHolder, Localization.T("modesel.learn"),    Localization.T("modesel.learn_sub"),    LearningMode.Learn,      UIFactory.Primary);
+            AddMode(listHolder, Localization.T("modesel.practice"), Localization.T("modesel.practice_sub"), LearningMode.Practice,   UIFactory.Success);
+            AddMode(listHolder, Localization.T("modesel.quiz"),     Localization.T("modesel.quiz_sub"),     LearningMode.Quiz,       UIFactory.Accent);
+            AddMode(listHolder, Localization.T("modesel.story"),    Localization.T("modesel.story_sub"),    LearningMode.Story,      new Color(0.55f, 0.40f, 0.90f));
+            AddMode(listHolder, Localization.T("modesel.speed"),    Localization.T("modesel.speed_sub"),    LearningMode.SpeedRound, UIFactory.Danger);
         }
 
         private void AddMode(RectTransform parent, string title, string subtitle,
@@ -81,10 +85,11 @@ namespace MathEdu.Modes
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
+            var titleAlign = Localization.IsRTL ? TextAlignmentOptions.Right : TextAlignmentOptions.Left;
             UIFactory.CreateText((RectTransform)col.transform, title, 56,
-                Color.white, TextAlignmentOptions.Left, "Title").fontStyle = FontStyles.Bold;
+                Color.white, titleAlign, "Title").fontStyle = FontStyles.Bold;
             UIFactory.CreateText((RectTransform)col.transform, subtitle, 30,
-                new Color(1, 1, 1, 0.9f), TextAlignmentOptions.Left, "Sub");
+                new Color(1, 1, 1, 0.9f), titleAlign, "Sub");
 
             var btn = card.gameObject.AddComponent<Button>();
             var colors = btn.colors;

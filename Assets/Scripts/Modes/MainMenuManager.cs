@@ -1,23 +1,15 @@
 // -----------------------------------------------------------------------------
-// MainMenuManager.cs
+// MainMenuManager.cs (fully localized)
 // -----------------------------------------------------------------------------
-// Builds the Main Menu screen at runtime:
-//   - Player name + avatar (top-left)
-//   - Total XP, total stars, badge count in the header strip
-//   - Grade selector (1, 2, 3)
-//   - Subject category grid for the selected grade, each card showing:
-//       • Subject emoji + bold name
-//       • Progress bar (highestLevelReached / 20)
-//       • "Level X / 20" label
-//       • Total stars earned in that subject
-//       • Empty-state "Tap to start!" when the subject has not been touched
-//   - Settings + Parental buttons
-// Choosing a subject takes the player to LevelSelect.
+// Builds the Main Menu screen. Every visible string flows through
+// Localization.T(). Subject card names use SubjectName() which maps each
+// MathSubject enum value to its localized string key.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,6 +27,22 @@ namespace MathEdu.Modes
 
         private int _selectedGrade = 1;
 
+        public static string SubjectName(MathSubject s) => s switch
+        {
+            MathSubject.Counting       => Localization.T("subj.counting"),
+            MathSubject.Addition       => Localization.T("subj.addition"),
+            MathSubject.Subtraction    => Localization.T("subj.subtraction"),
+            MathSubject.Multiplication => Localization.T("subj.multiplication"),
+            MathSubject.Division       => Localization.T("subj.division"),
+            MathSubject.Shapes         => Localization.T("subj.shapes"),
+            MathSubject.Patterns       => Localization.T("subj.patterns"),
+            MathSubject.Fractions      => Localization.T("subj.fractions"),
+            MathSubject.Measurement    => Localization.T("subj.measurement"),
+            MathSubject.Time           => Localization.T("subj.time"),
+            MathSubject.Money          => Localization.T("subj.money"),
+            _                          => s.ToString()
+        };
+
         private void Start()
         {
             var gm = GameManager.Instance;
@@ -48,7 +56,6 @@ namespace MathEdu.Modes
             _safeArea = safe;
             UIFactory.CreateThemedBackground(safe, "menu");
 
-            // -------- Header (avatar + title + XP/stars/badges) ------------
             var header = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.86f), new Vector2(1, 1f),
                 new Color(0, 0, 0, 0.25f), 0, "Header");
@@ -57,15 +64,19 @@ namespace MathEdu.Modes
 
             var profile = GameManager.Instance.Profile;
             var nameLbl = UIFactory.CreateText(header,
-                $"Hi {profile.playerName}!", 38,
-                Color.white, TextAlignmentOptions.MidlineLeft, "Welcome");
+                Localization.T("menu.hi", profile.playerName), 38,
+                Color.white,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Welcome");
             nameLbl.fontStyle = FontStyles.Bold;
             var nrt = nameLbl.rectTransform;
             nrt.anchorMin = new Vector2(0, 0); nrt.anchorMax = new Vector2(0.65f, 0.55f);
             nrt.offsetMin = new Vector2(200, 0); nrt.offsetMax = new Vector2(0, 0);
 
-            _titleLabel = UIFactory.CreateText(header, "MathEdu - Learn. Play. Win.", 56,
-                Color.white, TextAlignmentOptions.MidlineLeft, "Title");
+            _titleLabel = UIFactory.CreateText(header, Localization.T("menu.title"), 56,
+                Color.white,
+                Localization.IsRTL ? TextAlignmentOptions.MidlineRight : TextAlignmentOptions.MidlineLeft,
+                "Title");
             _titleLabel.fontStyle = FontStyles.Bold;
             var trt = _titleLabel.rectTransform;
             trt.anchorMin = new Vector2(0, 0.55f); trt.anchorMax = new Vector2(0.65f, 1);
@@ -90,7 +101,6 @@ namespace MathEdu.Modes
             _xpLabel    = UIFactory.CreateText(sh, $"XP {profile.xp}",
                 34, Color.white, TextAlignmentOptions.MidlineRight, "XPLabel");
 
-            // -------- Grade selector strip ---------------------------------
             var gradeStrip = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.78f), new Vector2(1, 0.86f),
                 new Color(0, 0, 0, 0.20f), 0, "GradeStrip");
@@ -102,14 +112,17 @@ namespace MathEdu.Modes
             ((RectTransform)gradeLayout.transform).offsetMin = Vector2.zero;
             ((RectTransform)gradeLayout.transform).offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)gradeLayout.transform, "Choose grade:",
-                40, Color.white, TextAlignmentOptions.Left, "GradeLabel");
+            UIFactory.CreateText((RectTransform)gradeLayout.transform,
+                Localization.T("menu.choose_grade"),
+                40, Color.white,
+                Localization.IsRTL ? TextAlignmentOptions.Right : TextAlignmentOptions.Left,
+                "GradeLabel");
 
             for (int g = 1; g <= 3; g++)
             {
                 int captured = g;
                 var btn = UIFactory.CreateButton((RectTransform)gradeLayout.transform,
-                    $"Grade {g}",
+                    Localization.T("setup.grade_n", g),
                     g == _selectedGrade ? UIFactory.Accent : UIFactory.Primary,
                     44, $"GradeBtn_{g}");
                 btn.onClick.AddListener(() => OnGradeSelected(captured));
@@ -117,16 +130,12 @@ namespace MathEdu.Modes
                 le.preferredWidth = 240; le.preferredHeight = 120;
             }
 
-            // -------- Subject grid -----------------------------------------
             var gridScroll = UIFactory.CreateScrollView(safe, "SubjectScroll");
             var grt = (RectTransform)gridScroll.transform;
             grt.anchorMin = new Vector2(0, 0.12f); grt.anchorMax = new Vector2(1, 0.78f);
             grt.offsetMin = new Vector2(24, 0); grt.offsetMax = new Vector2(-24, 0);
 
             _subjectGridParent = gridScroll.content;
-            // DestroyImmediate (not Destroy) because LayoutGroup is
-            // [DisallowMultipleComponent] — see PlayerSetupManager for the
-            // full explanation.
             DestroyImmediate(_subjectGridParent.GetComponent<VerticalLayoutGroup>());
             var grid = _subjectGridParent.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(460, 320);
@@ -138,7 +147,6 @@ namespace MathEdu.Modes
 
             RebuildSubjectGrid();
 
-            // -------- Bottom action strip ----------------------------------
             var bottom = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0), new Vector2(1, 0.12f),
                 new Color(0, 0, 0, 0.30f), 0, "Bottom");
@@ -151,7 +159,7 @@ namespace MathEdu.Modes
             ((RectTransform)hLayout.transform).offsetMax = Vector2.zero;
 
             var continueBtn = UIFactory.CreateButton((RectTransform)hLayout.transform,
-                "Continue", UIFactory.Success, 48, "ContinueBtn");
+                Localization.T("menu.continue"), UIFactory.Success, 48, "ContinueBtn");
             continueBtn.onClick.AddListener(OnContinue);
 
             var settingsBtn = UIFactory.CreateIconButton((RectTransform)hLayout.transform,
@@ -178,7 +186,6 @@ namespace MathEdu.Modes
             var profile = GameManager.Instance.Profile;
             var avatar  = GameManager.Instance.Avatars?.FindById(profile.avatarId);
 
-            // Fallback if profile's avatarId doesn't resolve.
             if (avatar == null)
             {
                 var lib = GameManager.Instance.Avatars;
@@ -238,7 +245,7 @@ namespace MathEdu.Modes
             emoji.gameObject.AddComponent<LayoutElement>().preferredHeight = 90;
 
             var name = UIFactory.CreateText((RectTransform)col.transform,
-                subject.displayName, 44, Color.white,
+                SubjectName(subject.subject), 44, Color.white,
                 TextAlignmentOptions.Center, "Name");
             name.fontStyle = FontStyles.Bold;
             name.gameObject.AddComponent<LayoutElement>().preferredHeight = 50;
@@ -246,10 +253,8 @@ namespace MathEdu.Modes
             int stars       = GameManager.Instance.Progress.StarsForSubject(subject);
             int highest     = GameManager.Instance.Progress.HighestLevelReached(subject);
             int totalLevels = subject.levels != null ? Mathf.Max(1, subject.levels.Count) : 20;
-            bool started    = stars > 0 || highest > 1
-                              || HasAnyProgress(subject);
+            bool started    = stars > 0 || highest > 1 || HasAnyProgress(subject);
 
-            // Progress bar
             var progRow = new GameObject("ProgRow",
                 typeof(RectTransform), typeof(LayoutElement));
             progRow.transform.SetParent(col.transform, false);
@@ -259,14 +264,13 @@ namespace MathEdu.Modes
             var bar = ProgressBar.Spawn(prt, 22,
                 new Color(0, 0, 0, 0.30f), new Color(1f, 1f, 1f, 0.85f));
             bar.SetValue((float)highest / totalLevels);
-            // Anchor the bar over the full row.
             var brt = (RectTransform)bar.transform;
             brt.anchorMin = Vector2.zero; brt.anchorMax = Vector2.one;
             brt.offsetMin = Vector2.zero; brt.offsetMax = Vector2.zero;
 
             string lvlText = started
-                ? $"Level {highest} / {totalLevels}    {stars} ★"
-                : "Tap to start!";
+                ? Localization.T("menu.level_progress", highest, totalLevels, stars)
+                : Localization.T("menu.tap_to_start");
             var sub = UIFactory.CreateText((RectTransform)col.transform,
                 lvlText, 28,
                 started ? new Color(1, 1, 1, 0.95f) : new Color(1, 1, 1, 0.60f),
@@ -296,9 +300,6 @@ namespace MathEdu.Modes
             return false;
         }
 
-        // -------------------------------------------------------------------
-        // Event handlers
-        // -------------------------------------------------------------------
         private void OnGradeSelected(int g)
         {
             GameManager.Instance.Audio.PlaySFX("tap");
@@ -306,7 +307,6 @@ namespace MathEdu.Modes
             GameManager.Instance.SelectGrade(g);
             GameManager.Instance.SaveProfile();
 
-            // Rebuild the screen so the new grade's subject grid is shown.
             var oldCanvas = GameObject.Find("[MainMenuCanvas]");
             if (oldCanvas != null) DestroyImmediate(oldCanvas);
             Build();

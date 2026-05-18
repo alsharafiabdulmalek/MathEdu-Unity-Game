@@ -1,20 +1,14 @@
 // -----------------------------------------------------------------------------
-// LevelSelectManager.cs
+// LevelSelectManager.cs (localized)
 // -----------------------------------------------------------------------------
-// Shows a grid of level tiles for the currently selected (grade, subject).
-// Tapping an unlocked level proceeds to ModeSelect to pick a learning mode.
-//
-// Display rules:
-//   • Level 1 is always tappable (even before any progress exists).
-//   • Level N (N > 1) is tappable iff PlayerProfile says it's unlocked
-//     (set when level N-1 was completed with ≥1 star).
-//   • Unlocked tiles show the level's earned star count (☆☆☆ → ★★★).
-//   • Locked tiles show a padlock and a muted grey background.
+// 20-tile level grid for the current (grade, subject). Titles, locked/unlocked
+// labels, and footer hint all flow through Localization.T().
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -43,8 +37,10 @@ namespace MathEdu.Modes
 
             UIFactory.CreateText(header,
                 subject != null
-                    ? $"Grade {grade?.gradeNumber ?? 1} - {subject.displayName}"
-                    : "Pick a Subject",
+                    ? Localization.T("levelsel.header",
+                        grade?.gradeNumber ?? 1,
+                        MainMenuManager.SubjectName(subject.subject))
+                    : Localization.T("levelsel.title_no_subject"),
                 56, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
@@ -65,9 +61,6 @@ namespace MathEdu.Modes
             srt.offsetMin = new Vector2(24, 0); srt.offsetMax = new Vector2(-24, 0);
 
             var content = scroll.content;
-            // DestroyImmediate (not Destroy) because LayoutGroup is
-            // [DisallowMultipleComponent] — see PlayerSetupManager for the
-            // full explanation.
             DestroyImmediate(content.GetComponent<VerticalLayoutGroup>());
             var grid = content.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(300, 320);
@@ -83,16 +76,14 @@ namespace MathEdu.Modes
             }
             else
             {
-                UIFactory.CreateText(content,
-                    "No levels available for this subject.\nTap < to return.",
+                UIFactory.CreateText(content, Localization.T("levelsel.empty"),
                     36, Color.white, TextAlignmentOptions.Center, "Empty");
             }
 
             var bottom = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0), new Vector2(1, 0.06f),
                 new Color(0, 0, 0, 0.35f), 0, "Bottom");
-            UIFactory.CreateText(bottom,
-                "★ = stars earned    🔒 = locked - beat the previous level to unlock!",
+            UIFactory.CreateText(bottom, Localization.T("levelsel.hint"),
                 26, Color.white, TextAlignmentOptions.Center, "Hint");
         }
 
@@ -112,7 +103,7 @@ namespace MathEdu.Modes
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
             UIFactory.CreateText((RectTransform)col.transform,
-                $"Level {level.levelNumber}", 52,
+                Localization.T("levelsel.level_n", level.levelNumber), 52,
                 unlocked ? UIFactory.TextDark : Color.white,
                 TextAlignmentOptions.Center, "Num")
                 .fontStyle = FontStyles.Bold;

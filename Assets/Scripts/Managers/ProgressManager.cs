@@ -1,23 +1,9 @@
 // -----------------------------------------------------------------------------
-// ProgressManager.cs
+// ProgressManager.cs (with localized PrettyBadgeName)
 // -----------------------------------------------------------------------------
-// Coordinates progress events: recording results, unlocking next levels,
-// awarding XP / badges, persisting changes via SaveSystem, and producing
-// the SessionResult payload consumed by the Results scene.
-//
-// Badge taxonomy implemented here (see MaybeAwardMetaBadges for full rules):
-//   • first_step              — first level ever completed with ≥1 star
-//   • {subject}_apprentice_g{N}  — complete Level 5 of subject in grade N
-//   • {subject}_master_g{N}      — complete Level 20 of subject in grade N
-//   • half_way_there           — any subject Level 10 completed
-//   • speed_demon             — survive 25 correct in a row in Speed Round
-//   • perfect_score           — get 10/10 in Quiz Mode
-//   • early_bird              — complete a level before 8 AM local time
-//   • dedicated               — play on 3 consecutive days
-//
-// Unlock rules:
-//   • Level 1 of every subject is unlocked at boot via GameManager.
-//   • Level N+1 unlocks when level N has been completed with at least 1 star.
+// Same business logic as before. The only externally-visible change is that
+// PrettyBadgeName() now routes through Localization.T() so Arabic users see
+// 'first_step' as 'al-khatwah al-uwla' instead of '🌱 First Step'.
 // -----------------------------------------------------------------------------
 
 using System;
@@ -34,11 +20,6 @@ namespace MathEdu.Managers
         public event Action<string /*badgeId*/>                      OnBadgeAwarded;
         public event Action<int /*newXp*/>                           OnXPGained;
 
-        /// <summary>
-        /// Record a finished level. Returns a fully-populated SessionResult
-        /// for the Results scene to render. Always safe to call even when
-        /// inputs are partially null (returns a fallback SessionResult).
-        /// </summary>
         public SessionResult CompleteLevel(
             LevelData level, int correct, int total, int score,
             LearningMode mode, int maxStreak, bool failedEarly)
@@ -68,26 +49,19 @@ namespace MathEdu.Managers
                 return fallback;
             }
             var profile = GameManager.Instance != null ? GameManager.Instance.Profile : null;
-            if (profile == null)
-            {
-                Debug.LogWarning("[ProgressManager] No PlayerProfile available; returning fallback result.");
-                return fallback;
-            }
+            if (profile == null) return fallback;
 
             int wrong = Math.Max(0, total - correct);
             int stars = level.ComputeStars(correct, total);
             bool firstCompletion = profile.GetOrCreate(level.levelId).timesPlayed == 0;
             profile.RecordResult(level.levelId, stars, score);
 
-            // XP scaled by stars (minimum 1× for a played-but-failed level).
             int xp = level.xpReward * Mathf.Max(1, stars);
             profile.xp += xp;
             OnXPGained?.Invoke(profile.xp);
 
             var newBadges = new List<string>();
 
-            // Optional badge baked onto the LevelData itself (e.g. mastery
-            // badges on level 20). Only granted at 3-star clears.
             if (stars == 3 && !string.IsNullOrEmpty(level.badgeId)
                 && !profile.HasBadge(level.badgeId))
             {
@@ -96,7 +70,6 @@ namespace MathEdu.Managers
                 OnBadgeAwarded?.Invoke(level.badgeId);
             }
 
-            // Per-subject rollup for the Parental Dashboard.
             var subj = GameManager.Instance.CurrentSubject;
             string subjectKey = subj != null ? subj.SubjectKey : level.levelId;
             if (subj != null)
@@ -110,7 +83,6 @@ namespace MathEdu.Managers
                     seconds:    GameManager.Instance.Session.elapsedSeconds);
             }
 
-            // Unlock next level — only if the player earned at least 1 star.
             bool nextUnlocked = stars > 0 && UnlockNext(level);
             if (nextUnlocked && subj != null)
             {
@@ -122,10 +94,8 @@ namespace MathEdu.Managers
                 profile.RecordSubjectHighestUnlocked(subj.SubjectKey, level.levelNumber);
             }
 
-            // Meta badges (first step, perfect score, speed demon, etc.).
             MaybeAwardMetaBadges(profile, level, correct, total, score, stars, mode, maxStreak, newBadges, subjectKey);
 
-            // Daily play streak.
             bool streakExtended = profile.TouchPlayDay();
             if (streakExtended && profile.consecutiveDayStreak >= 3
                 && !profile.HasBadge("dedicated"))
@@ -158,11 +128,6 @@ namespace MathEdu.Managers
             };
         }
 
-        /// <summary>
-        /// Convenience: read the unlock state for any (subject, levelNumber)
-        /// pair. Level 1 is always considered unlocked even before the
-        /// PlayerProfile entry exists, so a fresh user can play immediately.
-        /// </summary>
         public bool IsLevelUnlocked(SubjectData subject, int levelNumber)
         {
             if (subject == null || levelNumber < 1) return false;
@@ -174,7 +139,6 @@ namespace MathEdu.Managers
             return profile.IsUnlocked(level.levelId);
         }
 
-        /// <summary>Total stars earned across every level of a given subject.</summary>
         public int StarsForSubject(SubjectData subject)
         {
             if (subject == null) return 0;
@@ -186,7 +150,6 @@ namespace MathEdu.Managers
             return total;
         }
 
-        /// <summary>Highest level number reached in a subject (1..N).</summary>
         public int HighestLevelReached(SubjectData subject)
         {
             if (subject == null) return 1;
@@ -202,9 +165,6 @@ namespace MathEdu.Managers
             return highest;
         }
 
-        // -------------------------------------------------------------------
-        // Internal
-        // -------------------------------------------------------------------
         private bool UnlockNext(LevelData current)
         {
             var subject = GameManager.Instance.CurrentSubject;
@@ -230,23 +190,18 @@ namespace MathEdu.Managers
             int correct, int total, int score, int stars,
             LearningMode mode, int maxStreak, List<string> newBadges, string subjectKey)
         {
-            // "First Step" — first level ever cleared.
             if (stars > 0 && !profile.HasBadge("first_step"))
             {
                 profile.AwardBadge("first_step");
                 newBadges.Add("first_step");
                 OnBadgeAwarded?.Invoke("first_step");
             }
-
-            // "Half Way There" — clear any subject's Level 10.
             if (stars > 0 && level.levelNumber == 10 && !profile.HasBadge("half_way_there"))
             {
                 profile.AwardBadge("half_way_there");
                 newBadges.Add("half_way_there");
                 OnBadgeAwarded?.Invoke("half_way_there");
             }
-
-            // "{Subject} Apprentice" at L5, "{Subject} Master" at L20.
             int grade = GameManager.Instance.Session.selectedGrade;
             string subKey = subjectKey;
             if (stars > 0 && level.levelNumber == 5)
@@ -269,8 +224,6 @@ namespace MathEdu.Managers
                     OnBadgeAwarded?.Invoke(id);
                 }
             }
-
-            // "Perfect Score" — 10/10 in Quiz Mode.
             if (mode == LearningMode.Quiz && total > 0 && correct == total
                 && !profile.HasBadge("perfect_score"))
             {
@@ -278,8 +231,6 @@ namespace MathEdu.Managers
                 newBadges.Add("perfect_score");
                 OnBadgeAwarded?.Invoke("perfect_score");
             }
-
-            // "Speed Demon" — survive 25 correct in a row in Speed Round.
             if (mode == LearningMode.SpeedRound)
             {
                 if (maxStreak > profile.speedRoundBestStreak)
@@ -292,8 +243,6 @@ namespace MathEdu.Managers
                     OnBadgeAwarded?.Invoke("speed_demon");
                 }
             }
-
-            // "Early Bird" — completed a level before 8 AM local time.
             if (stars > 0 && DateTime.Now.Hour < 8
                 && !profile.HasBadge("early_bird"))
             {
@@ -304,43 +253,62 @@ namespace MathEdu.Managers
         }
 
         // -------------------------------------------------------------------
-        // Pretty names for badges (used by Parental Dashboard + Results)
+        // Pretty names for badges - now flows through Localization
         // -------------------------------------------------------------------
         public static string PrettyBadgeName(string id)
         {
             if (string.IsNullOrEmpty(id)) return "";
             switch (id)
             {
-                case "first_step":     return "🌱 First Step";
-                case "half_way_there": return "🛤 Half Way There";
-                case "perfect_score":  return "💯 Perfect Score";
-                case "speed_demon":    return "⚡ Speed Demon";
-                case "early_bird":     return "🌅 Early Bird";
-                case "dedicated":      return "📅 Dedicated";
+                case "first_step":     return Localization.T("badge.first_step");
+                case "half_way_there": return Localization.T("badge.half_way");
+                case "perfect_score":  return Localization.T("badge.perfect_score");
+                case "speed_demon":    return Localization.T("badge.speed_demon");
+                case "early_bird":     return Localization.T("badge.early_bird");
+                case "dedicated":      return Localization.T("badge.dedicated");
             }
-            // Pattern-derived names.
+            // Pattern-derived names (subject-grade specific). We pass the
+            // *localized* subject name to the apprentice/master format string
+            // so Arabic users see 'mutadrib aljame' instead of 'addition Apprentice'.
             if (id.EndsWith("_apprentice_g1") || id.EndsWith("_apprentice_g2") || id.EndsWith("_apprentice_g3"))
             {
                 string subj = id.Substring(0, id.IndexOf("_apprentice"));
                 string g = id.Substring(id.Length - 1);
-                return $"🎓 {Capitalize(subj)} Apprentice (G{g})";
+                return Localization.T("badge.apprentice_fmt", LocalizedSubjectFromKey(subj), g);
             }
             if (id.EndsWith("_master_g1") || id.EndsWith("_master_g2") || id.EndsWith("_master_g3"))
             {
                 string subj = id.Substring(0, id.IndexOf("_master"));
                 string g = id.Substring(id.Length - 1);
-                return $"🏆 {Capitalize(subj)} Master (G{g})";
+                return Localization.T("badge.master_fmt", LocalizedSubjectFromKey(subj), g);
             }
-            // Legacy: master_addition_1 style from earlier builds.
-            if (id.StartsWith("master_"))   return $"🏆 {Capitalize(id.Substring(7))} Master";
-            if (id.StartsWith("halfway_"))  return $"🛤 {Capitalize(id.Substring(8))} Half-Way";
+            // Legacy fallbacks for older save data.
+            if (id.StartsWith("master_"))   return Localization.T("badge.master_fmt", LocalizedSubjectFromKey(id.Substring(7)), "?");
+            if (id.StartsWith("halfway_"))  return Localization.T("badge.half_way");
             return id;
         }
 
-        private static string Capitalize(string s)
+        /// <summary>
+        /// Map a lowercase subject key back to the localized display name.
+        /// </summary>
+        private static string LocalizedSubjectFromKey(string key)
         {
-            if (string.IsNullOrEmpty(s)) return s;
-            return char.ToUpper(s[0]) + s.Substring(1);
+            if (string.IsNullOrEmpty(key)) return "?";
+            return key switch
+            {
+                "counting"       => Localization.T("subj.counting"),
+                "addition"       => Localization.T("subj.addition"),
+                "subtraction"    => Localization.T("subj.subtraction"),
+                "multiplication" => Localization.T("subj.multiplication"),
+                "division"       => Localization.T("subj.division"),
+                "shapes"         => Localization.T("subj.shapes"),
+                "patterns"       => Localization.T("subj.patterns"),
+                "fractions"      => Localization.T("subj.fractions"),
+                "measurement"    => Localization.T("subj.measurement"),
+                "time"           => Localization.T("subj.time"),
+                "money"          => Localization.T("subj.money"),
+                _                => char.ToUpper(key[0]) + key.Substring(1)
+            };
         }
     }
 }
