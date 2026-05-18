@@ -3,6 +3,18 @@
 // -----------------------------------------------------------------------------
 // Pops a big "✓ Correct!" or "✗ Try again" message in the centre of the
 // screen, then fades it out. Used by all gameplay modes to celebrate answers.
+//
+// Lifecycle:
+//   • Spawn() builds the widget and immediately deactivates it so it doesn't
+//     occupy screen space until the first answer.
+//   • ShowCorrect() / ShowWrong() re-activate the GameObject *before*
+//     StartCoroutine — Unity refuses to start a coroutine on an inactive
+//     host (logs "Coroutine couldn't be started because the game object
+//     'AnimatedFeedback' is inactive!"), and the coroutine's first line
+//     (gameObject.SetActive(true)) never runs because the coroutine never
+//     starts.
+//   • PopFade() ends by deactivating the GameObject again so the next
+//     answer can re-activate cleanly.
 // -----------------------------------------------------------------------------
 
 using System.Collections;
@@ -44,6 +56,10 @@ namespace MathEdu.UI
 
         public void ShowCorrect(string msg = "Correct!")
         {
+            // Re-activate BEFORE StartCoroutine. Unity won't start coroutines
+            // on inactive GameObjects, and PopFade's own SetActive(true) is
+            // never reached because the coroutine never starts.
+            if (!gameObject.activeSelf) gameObject.SetActive(true);
             StopAllCoroutines();
             _bg.color = UIFactory.Success;
             _label.text = "✓ " + msg;
@@ -52,6 +68,7 @@ namespace MathEdu.UI
 
         public void ShowWrong(string msg = "Try again")
         {
+            if (!gameObject.activeSelf) gameObject.SetActive(true);
             StopAllCoroutines();
             _bg.color = UIFactory.Danger;
             _label.text = "✗ " + msg;
@@ -60,7 +77,10 @@ namespace MathEdu.UI
 
         private IEnumerator PopFade()
         {
-            gameObject.SetActive(true);
+            // Belt and braces — Spawn() deactivated us once, and ShowCorrect /
+            // ShowWrong now re-activate before invoking us; this assignment is
+            // defensive in case some other future caller forgets.
+            if (!gameObject.activeSelf) gameObject.SetActive(true);
             var cg = GetComponent<CanvasGroup>();
             var rt = (RectTransform)transform;
             cg.alpha = 1;
