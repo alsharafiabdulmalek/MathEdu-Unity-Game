@@ -124,7 +124,10 @@ namespace MathEdu.Modes
             grt.offsetMin = new Vector2(24, 0); grt.offsetMax = new Vector2(-24, 0);
 
             _subjectGridParent = gridScroll.content;
-            Destroy(_subjectGridParent.GetComponent<VerticalLayoutGroup>());
+            // DestroyImmediate (not Destroy) because LayoutGroup is
+            // [DisallowMultipleComponent] — see PlayerSetupManager for the
+            // full explanation.
+            DestroyImmediate(_subjectGridParent.GetComponent<VerticalLayoutGroup>());
             var grid = _subjectGridParent.gameObject.AddComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(460, 320);
             grid.spacing  = new Vector2(24, 24);
