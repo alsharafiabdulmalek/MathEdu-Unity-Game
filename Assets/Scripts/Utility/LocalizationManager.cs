@@ -1,32 +1,29 @@
 // -----------------------------------------------------------------------------
-// LocalizationManager.cs
+// LocalizationManager.cs (with TTF-based Arabic font loading)
 // -----------------------------------------------------------------------------
 // Lightweight i18n system for MathEdu. Currently ships:
 //   • English (en) — default
 //   • Arabic  (ar) — full UI with right-to-left text rendering + Arabic font
 //
-// Usage:
+// ====== FONT LOADING ORDER ===================================================
+// To render Arabic glyphs (not square boxes), TextMeshPro needs the actual
+// TTF/OTF data of an Arabic-capable font. We try three sources, in order:
 //
-//     using MathEdu.Utility;
-//     ...
-//     UIFactory.CreateText(parent, Localization.T("setup.welcome"), 64, ...);
-//     UIFactory.CreateText(parent, Localization.T("menu.hi", playerName), ...);
+//   1. A pre-authored TMP_FontAsset at Resources/Fonts/Arabic SDF.asset
+//      (best quality - run Font Asset Creator on an Arabic TTF and save).
 //
-// Switching languages:
+//   2. A raw TTF in Resources/Fonts/ named NotoSansArabic-Regular,
+//      Cairo-Regular, Amiri-Regular, or NotoNaskhArabic-Regular.
+//      The code creates a TMP_FontAsset from it at runtime.
+//      EASIEST USER SETUP: just drag the .ttf into Assets/Resources/Fonts/.
 //
-//     Localization.SetLanguage(Localization.Lang.Arabic);
-//     // OnLanguageChanged fires; Settings reloads the scene to re-render UI.
+//   3. A dynamic OS font (last resort; on Android/iOS this can fail to
+//      render Arabic because TMP needs the actual TTF data, not an OS
+//      handle - if user sees square boxes they reached this path).
 //
-// Font + RTL handling:
-//   UIFactory.CreateText() automatically calls Localization.Apply(tmp) on every
-//   text it creates, so changing language and reloading any scene swaps the
-//   font (to a system Arabic-capable font generated at runtime) and flips
-//   the TextMeshPro isRightToLeftText flag in one place.
-//
-// Adding a new language:
-//   1. Add a new Lang enum value (e.g. Lang.French).
-//   2. Add a parallel Dictionary<string, string> with the translated strings.
-//   3. Extend SetLanguage / CurrentCode / T to dispatch on the new value.
+// When found, the Arabic font is ALSO registered into
+// TMP_Settings.fallbackFontAssets so even non-localized strings get
+// Arabic glyphs via the global TMP fallback chain.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -43,10 +40,10 @@ namespace MathEdu.Utility
         public static bool IsRTL => Current == Lang.Arabic;
         public static string CurrentCode => Current == Lang.Arabic ? "ar" : "en";
 
-        /// <summary>Fired after SetLanguage commits a change. Scenes should reload to rebuild UI.</summary>
         public static event System.Action OnLanguageChanged;
 
         private static TMP_FontAsset _arabicFont;
+        private static bool _fallbackRegistered;
 
         // -------------------------------------------------------------------
         // Public API
@@ -65,11 +62,6 @@ namespace MathEdu.Utility
                 ? Lang.Arabic : Lang.English);
         }
 
-        /// <summary>
-        /// Translate <paramref name="key"/> into the current language. If the key isn't
-        /// in the current table, falls back to English. If not in English either,
-        /// returns the key itself (so missing translations are visible during dev).
-        /// </summary>
         public static string T(string key, params object[] args)
         {
             var dict = Current == Lang.Arabic ? Ar : En;
@@ -87,34 +79,92 @@ namespace MathEdu.Utility
         }
 
         /// <summary>
-        /// Lazily create (or load from Resources) a TMP font asset that supports
-        /// Arabic glyphs. On mobile we generate one at runtime from the device's
-        /// system font ("Arial" maps to Roboto on Android and Helvetica on iOS,
-        /// both of which have full Arabic coverage via OS fallback chains; on
-        /// macOS "Geeza Pro" is the canonical Arabic font).
+        /// Returns a TMP font asset that can render Arabic glyphs. Tries:
+        ///   1) preauthored Resources/Fonts/Arabic SDF.asset
+        ///   2) raw TTF in Resources/Fonts/ converted at runtime
+        ///   3) OS dynamic font (last resort - may not render on Android/iOS)
+        /// On success also registers as a global TMP fallback.
+        /// On failure logs a clear "how to fix" message.
         /// </summary>
         public static TMP_FontAsset ArabicFont
         {
             get
             {
                 if (_arabicFont != null) return _arabicFont;
-                var preauthored = Resources.Load<TMP_FontAsset>("Fonts/Arabic SDF");
-                if (preauthored != null) { _arabicFont = preauthored; return _arabicFont; }
+
+                // Path 1: preauthored TMP_FontAsset (best quality)
+                _arabicFont = Resources.Load<TMP_FontAsset>("Fonts/Arabic SDF");
+                if (_arabicFont != null)
+                {
+                    Debug.Log("[Localization] Loaded preauthored 'Fonts/Arabic SDF' TMP asset.");
+                    RegisterAsTmpFallback(_arabicFont);
+                    return _arabicFont;
+                }
+
+                // Path 2: raw TTF in Resources/Fonts/, convert at runtime
+                string[] ttfNames = {
+                    "Fonts/NotoSansArabic-Regular",
+                    "Fonts/NotoSansArabic",
+                    "Fonts/Cairo-Regular",
+                    "Fonts/Cairo",
+                    "Fonts/Amiri-Regular",
+                    "Fonts/Amiri",
+                    "Fonts/NotoNaskhArabic-Regular",
+                    "Fonts/NotoNaskhArabic",
+                    "Fonts/Arabic"
+                };
+                foreach (var name in ttfNames)
+                {
+                    var ttf = Resources.Load<Font>(name);
+                    if (ttf == null) continue;
+                    try
+                    {
+                        _arabicFont = TMP_FontAsset.CreateFontAsset(ttf);
+                        if (_arabicFont != null)
+                        {
+                            _arabicFont.name = name + " SDF (Runtime)";
+                            Debug.Log("[Localization] Created TMP font from " + name);
+                            RegisterAsTmpFallback(_arabicFont);
+                            return _arabicFont;
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Debug.LogWarning("[Localization] CreateFontAsset(" + name + ") failed: " + ex.Message);
+                    }
+                }
+
+                // Path 3: OS dynamic font (last resort)
                 try
                 {
-                    string[] candidates = { "Arial", "Tahoma", "Geeza Pro", "Helvetica", "Noto Sans Arabic" };
-                    var sysFont = Font.CreateDynamicFontFromOSFont(candidates, 48);
+                    string[] osCandidates = {
+                        "Noto Sans Arabic", "Tahoma", "Arial",
+                        "Geeza Pro", "Helvetica", "Amiri", "Cairo"
+                    };
+                    var sysFont = Font.CreateDynamicFontFromOSFont(osCandidates, 48);
                     if (sysFont != null)
                     {
                         _arabicFont = TMP_FontAsset.CreateFontAsset(sysFont);
-                        if (_arabicFont != null) _arabicFont.name = "Arabic SDF (Runtime)";
+                        if (_arabicFont != null)
+                        {
+                            _arabicFont.name = "OS Arabic SDF (Runtime)";
+                            Debug.LogWarning(
+                                "[Localization] Using OS dynamic font for Arabic. " +
+                                "Arabic glyphs may appear as squares on mobile because " +
+                                "TMP needs the actual TTF data. " +
+                                "Add a real TTF to Assets/Resources/Fonts/ to fix.");
+                            RegisterAsTmpFallback(_arabicFont);
+                            return _arabicFont;
+                        }
                     }
                 }
-                catch (System.Exception e)
+                catch (System.Exception ex)
                 {
-                    Debug.LogWarning("[Localization] Could not build Arabic font: " + e.Message);
+                    Debug.LogWarning("[Localization] OS Arabic font creation failed: " + ex.Message);
                 }
-                return _arabicFont;
+
+                Debug.LogError(ArabicFontMissingMessage);
+                return null;
             }
         }
 
@@ -135,29 +185,55 @@ namespace MathEdu.Utility
         }
 
         // -------------------------------------------------------------------
+        // Internals
+        // -------------------------------------------------------------------
+
+        private static void RegisterAsTmpFallback(TMP_FontAsset font)
+        {
+            if (font == null || _fallbackRegistered) return;
+            try
+            {
+                var settings = TMP_Settings.instance;
+                if (settings == null) return;
+                var fallbacks = settings.fallbackFontAssets;
+                if (fallbacks == null) return;
+                if (!fallbacks.Contains(font))
+                {
+                    fallbacks.Add(font);
+                    Debug.Log("[Localization] Registered " + font.name +
+                              " as TMP global fallback. All TMP texts can now render Arabic glyphs.");
+                }
+                _fallbackRegistered = true;
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning("[Localization] Could not register TMP fallback: " + ex.Message);
+            }
+        }
+
+        public const string ArabicFontMissingMessage =
+            "*** Arabic text will appear as SQUARE BOXES ***\n" +
+            "No Arabic-capable TMP font asset found in Resources/Fonts/.\n\n" +
+            "QUICK FIX (one-time, ~1 minute):\n" +
+            "  1. Open https://fonts.google.com/noto/specimen/Noto+Sans+Arabic\n" +
+            "  2. Click 'Get font' > 'Download all' and unzip.\n" +
+            "  3. In Unity, create folder Assets/Resources/Fonts/ if needed.\n" +
+            "  4. Drag NotoSansArabic-Regular.ttf into that folder.\n" +
+            "  5. Stop and restart Play mode (or rebuild for Android/iOS).\n\n" +
+            "Code auto-detects the TTF and creates a TMP font asset at runtime.\n" +
+            "See Docs/ARABIC_FONT_SETUP.md for full details.";
+
+        // -------------------------------------------------------------------
         //                   ENGLISH (default fallback table)
         // -------------------------------------------------------------------
         private static readonly Dictionary<string, string> En = new Dictionary<string, string>
         {
-            // common
-            { "common.ok", "OK" },
-            { "common.cancel", "Cancel" },
-            { "common.back", "Back" },
-            { "common.continue", "Continue" },
-            { "common.next", "Next" },
-            { "common.retry", "Retry" },
-            { "common.menu", "Menu" },
-            { "common.quit", "Quit" },
-            { "common.start", "Start" },
-            { "common.done", "Done!" },
-            { "common.save", "Save" },
-            { "common.delete", "Delete" },
-
-            // Bootstrap
+            { "common.ok", "OK" }, { "common.cancel", "Cancel" }, { "common.back", "Back" },
+            { "common.continue", "Continue" }, { "common.next", "Next" }, { "common.retry", "Retry" },
+            { "common.menu", "Menu" }, { "common.quit", "Quit" }, { "common.start", "Start" },
+            { "common.done", "Done!" }, { "common.save", "Save" }, { "common.delete", "Delete" },
             { "boot.app_name", "MathEdu" },
             { "boot.tagline", "Learn. Play. Win." },
-
-            // Player setup
             { "setup.welcome", "Welcome!" },
             { "setup.subtitle", "Let's set up your player profile." },
             { "setup.name_label", "Name:" },
@@ -167,36 +243,22 @@ namespace MathEdu.Utility
             { "setup.start_playing", "Start Playing!" },
             { "setup.footer", "You can change these later in Settings." },
             { "setup.grade_n", "Grade {0}" },
-
-            // Main menu
             { "menu.hi", "Hi {0}!" },
             { "menu.title", "MathEdu - Learn. Play. Win." },
             { "menu.choose_grade", "Choose grade:" },
             { "menu.continue", "Continue" },
             { "menu.tap_to_start", "Tap to start!" },
             { "menu.level_progress", "Level {0} / {1}    {2} \u2605" },
-
-            // Subjects
-            { "subj.counting", "Counting" },
-            { "subj.addition", "Addition" },
-            { "subj.subtraction", "Subtraction" },
-            { "subj.multiplication", "Multiplication" },
-            { "subj.division", "Division" },
-            { "subj.shapes", "Shapes" },
-            { "subj.patterns", "Patterns" },
-            { "subj.fractions", "Fractions" },
-            { "subj.measurement", "Measurement" },
-            { "subj.time", "Time" },
-            { "subj.money", "Money" },
-
-            // Level select
+            { "subj.counting", "Counting" }, { "subj.addition", "Addition" },
+            { "subj.subtraction", "Subtraction" }, { "subj.multiplication", "Multiplication" },
+            { "subj.division", "Division" }, { "subj.shapes", "Shapes" },
+            { "subj.patterns", "Patterns" }, { "subj.fractions", "Fractions" },
+            { "subj.measurement", "Measurement" }, { "subj.time", "Time" }, { "subj.money", "Money" },
             { "levelsel.header", "Grade {0} - {1}" },
             { "levelsel.title_no_subject", "Pick a Subject" },
             { "levelsel.level_n", "Level {0}" },
             { "levelsel.hint", "\u2605 = stars earned    \ud83d\udd12 = locked - beat the previous level to unlock!" },
             { "levelsel.empty", "No levels available for this subject.\nTap < to return." },
-
-            // Mode select
             { "modesel.title", "Grade {0} \u2022 {1} \u2022 Level {2}" },
             { "modesel.learn", "Learn" },
             { "modesel.learn_sub", "Step-by-step lesson with an example." },
@@ -208,32 +270,19 @@ namespace MathEdu.Utility
             { "modesel.story_sub", "Math adventure with characters." },
             { "modesel.speed", "Speed Round" },
             { "modesel.speed_sub", "Fast-fire questions. How many in a row?" },
-
-            // Gameplay (shared)
             { "gp.header_format", "{0} - {1} L{2}" },
             { "gp.score", "Score: {0}" },
             { "gp.hint_btn", "\ud83d\udca1 Hint" },
-            { "gp.correct", "Correct!" },
-            { "gp.great_job", "Great job!" },
-            { "gp.you_got_it", "You got it!" },
-            { "gp.awesome", "Awesome!" },
-            { "gp.brilliant", "Brilliant!" },
-            { "gp.yes_excl", "Yes!" },
+            { "gp.correct", "Correct!" }, { "gp.great_job", "Great job!" },
+            { "gp.you_got_it", "You got it!" }, { "gp.awesome", "Awesome!" },
+            { "gp.brilliant", "Brilliant!" }, { "gp.yes_excl", "Yes!" },
             { "gp.wrong_answer_was", "Answer was {0}" },
-            { "gp.try_again", "Try again" },
-            { "gp.time_up", "Time's up!" },
-
-            // Pause / quit overlays
-            { "pause.paused", "Paused" },
-            { "pause.resume", "Resume" },
-            { "pause.restart", "Restart" },
-            { "pause.quit_level", "Quit Level" },
+            { "gp.try_again", "Try again" }, { "gp.time_up", "Time's up!" },
+            { "pause.paused", "Paused" }, { "pause.resume", "Resume" },
+            { "pause.restart", "Restart" }, { "pause.quit_level", "Quit Level" },
             { "quit.title", "Quit this level?" },
             { "quit.body", "Your progress on this level will be lost." },
-            { "quit.keep_playing", "Keep playing" },
-            { "quit.quit", "Quit" },
-
-            // Learn mode
+            { "quit.keep_playing", "Keep playing" }, { "quit.quit", "Quit" },
             { "learn.lesson", "Lesson" },
             { "learn.example_x_of_y", "Example {0} / {1}" },
             { "learn.practice", "Practice" },
@@ -244,8 +293,6 @@ namespace MathEdu.Utility
             { "learn.done_sub", "Try Practice or Quiz mode next." },
             { "learn.back_to_modes", "Back to modes" },
             { "learn.practice_now", "Practice now" },
-
-            // Results
             { "results.title_win", "Level Complete!" },
             { "results.title_lose", "Run Ended!" },
             { "results.correct_format", "Correct: {0} / {1}" },
@@ -253,14 +300,11 @@ namespace MathEdu.Utility
             { "results.streak_format", "Longest streak: {0}" },
             { "results.score_xp_format", "Score {0}     +{1} XP" },
             { "results.new_badge_label", "\ud83c\udfc5 New badge!" },
-            { "results.menu", "Menu" },
-            { "results.retry", "Retry" },
+            { "results.menu", "Menu" }, { "results.retry", "Retry" },
             { "results.next_level", "Next Level" },
             { "results.error_title", "\ud83d\ude05 Oops!" },
             { "results.error_body", "We couldn't load this level's results.\nLet's head back to the menu." },
             { "results.back_to_menu", "Back to Menu" },
-
-            // Settings
             { "settings.title", "Settings" },
             { "settings.music", "\ud83c\udfb5  Music" },
             { "settings.sfx", "\ud83d\udd0a  Sound Effects" },
@@ -279,41 +323,31 @@ namespace MathEdu.Utility
             { "settings.pin_confirm_body", "Type the new PIN again." },
             { "settings.reset_title", "Reset Progress?" },
             { "settings.reset_body", "Parental PIN required." },
-
-            // Parental dashboard
             { "parental.title", "Parental Dashboard" },
             { "parental.for_parents", "\ud83d\udd12 For Parents" },
             { "parental.enter_pin", "Enter your PIN. Default is 0000." },
             { "parental.try_again_n", "Try again in {0} s" },
             { "parental.progress_format", "{0}'s Progress" },
-            { "parental.stars", "\u2b50 Stars" },
-            { "parental.xp", "\ud83c\udfaf XP" },
+            { "parental.stars", "\u2b50 Stars" }, { "parental.xp", "\ud83c\udfaf XP" },
             { "parental.badges_emoji", "\ud83c\udfc6 Badges" },
-            { "parental.levels", "\ud83d\udcda Levels" },
-            { "parental.time", "\u23f1 Time" },
+            { "parental.levels", "\ud83d\udcda Levels" }, { "parental.time", "\u23f1 Time" },
             { "parental.grade", "\ud83c\udf93 Grade" },
             { "parental.accuracy_title", "Accuracy by Subject" },
             { "parental.accuracy_empty", "Accuracy stats appear after the first session." },
             { "parental.subject_details", "Subject Details" },
             { "parental.no_subjects", "No subjects played yet." },
-            { "parental.tbl_subject", "Subject" },
-            { "parental.tbl_q", "Q" },
-            { "parental.tbl_correct", "Correct" },
-            { "parental.tbl_stars", "Stars" },
-            { "parental.tbl_levels", "Levels" },
-            { "parental.tbl_time", "Time" },
+            { "parental.tbl_subject", "Subject" }, { "parental.tbl_q", "Q" },
+            { "parental.tbl_correct", "Correct" }, { "parental.tbl_stars", "Stars" },
+            { "parental.tbl_levels", "Levels" }, { "parental.tbl_time", "Time" },
             { "parental.badges_title", "Badges" },
             { "parental.no_badges", "No badges yet - earn one by clearing a level!" },
             { "parental.grade_completion", "Grade Completion" },
-            { "parental.grade_n", "Grade {0}" },
-            { "parental.change_pin", "Change PIN" },
+            { "parental.grade_n", "Grade {0}" }, { "parental.change_pin", "Change PIN" },
             { "parental.reset_progress", "Reset Progress" },
             { "parental.reset_confirm_title", "Confirm Reset" },
             { "parental.reset_confirm_body", "Type the parental PIN to wipe all progress." },
             { "parental.new_pin", "New Parental PIN" },
             { "parental.pick_pin", "Pick a 4-8 digit PIN." },
-
-            // Badges (pretty names)
             { "badge.first_step", "\ud83c\udf31 First Step" },
             { "badge.half_way", "\ud83d\udee4 Half Way There" },
             { "badge.speed_demon", "\u26a1 Speed Demon" },
@@ -329,7 +363,6 @@ namespace MathEdu.Utility
         // -------------------------------------------------------------------
         private static readonly Dictionary<string, string> Ar = new Dictionary<string, string>
         {
-            // common
             { "common.ok", "\u0645\u0648\u0627\u0641\u0642" },
             { "common.cancel", "\u0625\u0644\u063a\u0627\u0621" },
             { "common.back", "\u0631\u062c\u0648\u0639" },
@@ -342,12 +375,8 @@ namespace MathEdu.Utility
             { "common.done", "\u062a\u0645\u0651!" },
             { "common.save", "\u062d\u0641\u0638" },
             { "common.delete", "\u062d\u0630\u0641" },
-
-            // Bootstrap
             { "boot.app_name", "\u0645\u0627\u062b \u0625\u064a\u062f\u0648" },
             { "boot.tagline", "\u062a\u0639\u0644\u0651\u0645. \u0627\u0644\u0639\u0628. \u0627\u0631\u0628\u062d." },
-
-            // Player setup
             { "setup.welcome", "\u0645\u0631\u062d\u0628\u064b\u0627!" },
             { "setup.subtitle", "\u0647\u064a\u0651\u0627 \u0646\u064f\u062c\u0647\u0651\u0632 \u0645\u0644\u0641 \u0627\u0644\u0644\u0627\u0639\u0628." },
             { "setup.name_label", "\u0627\u0644\u0627\u0633\u0645:" },
@@ -357,16 +386,12 @@ namespace MathEdu.Utility
             { "setup.start_playing", "\u0627\u0628\u062f\u0623 \u0627\u0644\u0644\u0639\u0628!" },
             { "setup.footer", "\u064a\u0645\u0643\u0646\u0643 \u062a\u063a\u064a\u064a\u0631 \u0630\u0644\u0643 \u0644\u0627\u062d\u0642\u064b\u0627 \u0641\u064a \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a." },
             { "setup.grade_n", "\u0627\u0644\u0635\u0641 {0}" },
-
-            // Main menu
             { "menu.hi", "\u0645\u0631\u062d\u0628\u064b\u0627 {0}!" },
             { "menu.title", "\u0645\u0627\u062b \u0625\u064a\u062f\u0648 - \u062a\u0639\u0644\u0651\u0645. \u0627\u0644\u0639\u0628. \u0627\u0631\u0628\u062d." },
             { "menu.choose_grade", "\u0627\u062e\u062a\u0631 \u0627\u0644\u0635\u0641:" },
             { "menu.continue", "\u0645\u062a\u0627\u0628\u0639\u0629" },
             { "menu.tap_to_start", "\u0627\u0636\u063a\u0637 \u0644\u0644\u0628\u062f\u0621!" },
             { "menu.level_progress", "\u0627\u0644\u0645\u0633\u062a\u0648\u0649 {0} / {1}    {2} \u2605" },
-
-            // Subjects
             { "subj.counting", "\u0627\u0644\u0639\u062f\u0651" },
             { "subj.addition", "\u0627\u0644\u062c\u0645\u0639" },
             { "subj.subtraction", "\u0627\u0644\u0637\u0631\u062d" },
@@ -378,15 +403,11 @@ namespace MathEdu.Utility
             { "subj.measurement", "\u0627\u0644\u0642\u064a\u0627\u0633" },
             { "subj.time", "\u0627\u0644\u0648\u0642\u062a" },
             { "subj.money", "\u0627\u0644\u0646\u0642\u0648\u062f" },
-
-            // Level select
             { "levelsel.header", "\u0627\u0644\u0635\u0641 {0} - {1}" },
             { "levelsel.title_no_subject", "\u0627\u062e\u062a\u0631 \u0645\u0627\u062f\u0651\u0629" },
             { "levelsel.level_n", "\u0627\u0644\u0645\u0633\u062a\u0648\u0649 {0}" },
             { "levelsel.hint", "\u2605 = \u0627\u0644\u0646\u062c\u0648\u0645 \u0627\u0644\u0645\u0643\u062a\u0633\u0628\u0629    \ud83d\udd12 = \u0645\u0642\u0641\u0644 - \u0623\u0646\u0647\u0650 \u0627\u0644\u0645\u0633\u062a\u0648\u0649 \u0627\u0644\u0633\u0627\u0628\u0642 \u0644\u0641\u062a\u062d\u0647!" },
             { "levelsel.empty", "\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0633\u062a\u0648\u064a\u0627\u062a \u0644\u0647\u0630\u0647 \u0627\u0644\u0645\u0627\u062f\u0651\u0629.\n\u0627\u0636\u063a\u0637 < \u0644\u0644\u0639\u0648\u062f\u0629." },
-
-            // Mode select
             { "modesel.title", "\u0627\u0644\u0635\u0641 {0} \u2022 {1} \u2022 \u0627\u0644\u0645\u0633\u062a\u0648\u0649 {2}" },
             { "modesel.learn", "\u062a\u0639\u0644\u0651\u0645" },
             { "modesel.learn_sub", "\u062f\u0631\u0633 \u062e\u0637\u0648\u0629 \u0628\u062e\u0637\u0648\u0629 \u0645\u0639 \u0645\u062b\u0627\u0644." },
@@ -398,8 +419,6 @@ namespace MathEdu.Utility
             { "modesel.story_sub", "\u0645\u063a\u0627\u0645\u0631\u0629 \u0631\u064a\u0627\u0636\u064a\u0629 \u0645\u0639 \u0634\u062e\u0635\u064a\u0627\u062a." },
             { "modesel.speed", "\u062c\u0648\u0644\u0629 \u0633\u0631\u064a\u0639\u0629" },
             { "modesel.speed_sub", "\u0623\u0633\u0626\u0644\u0629 \u0633\u0631\u064a\u0639\u0629. \u0643\u0645 \u0625\u062c\u0627\u0628\u0629 \u0635\u062d\u064a\u062d\u0629 \u0645\u062a\u062a\u0627\u0644\u064a\u0629\u061f" },
-
-            // Gameplay (shared)
             { "gp.header_format", "{0} - {1} \u0627\u0644\u0645\u0633\u062a\u0648\u0649 {2}" },
             { "gp.score", "\u0627\u0644\u0646\u062a\u064a\u062c\u0629: {0}" },
             { "gp.hint_btn", "\ud83d\udca1 \u062a\u0644\u0645\u064a\u062d" },
@@ -412,8 +431,6 @@ namespace MathEdu.Utility
             { "gp.wrong_answer_was", "\u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0647\u064a {0}" },
             { "gp.try_again", "\u062d\u0627\u0648\u0644 \u0645\u0631\u0651\u0629 \u0623\u062e\u0631\u0649" },
             { "gp.time_up", "\u0627\u0646\u062a\u0647\u0649 \u0627\u0644\u0648\u0642\u062a!" },
-
-            // Pause / quit overlays
             { "pause.paused", "\u0645\u062a\u0648\u0642\u0641" },
             { "pause.resume", "\u0627\u0633\u062a\u0645\u0631\u0627\u0631" },
             { "pause.restart", "\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u0634\u063a\u064a\u0644" },
@@ -422,8 +439,6 @@ namespace MathEdu.Utility
             { "quit.body", "\u0633\u062a\u0641\u0642\u062f \u062a\u0642\u062f\u0651\u0645\u0643 \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0645\u0633\u062a\u0648\u0649." },
             { "quit.keep_playing", "\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u0644\u0639\u0628" },
             { "quit.quit", "\u062e\u0631\u0648\u062c" },
-
-            // Learn mode
             { "learn.lesson", "\u062f\u0631\u0633" },
             { "learn.example_x_of_y", "\u0645\u062b\u0627\u0644 {0} / {1}" },
             { "learn.practice", "\u062a\u062f\u0631\u064a\u0628" },
@@ -434,8 +449,6 @@ namespace MathEdu.Utility
             { "learn.done_sub", "\u062c\u0631\u0651\u0628 \u0627\u0644\u062a\u062f\u0631\u064a\u0628 \u0623\u0648 \u0627\u0644\u0627\u062e\u062a\u0628\u0627\u0631 \u0628\u0639\u062f \u0630\u0644\u0643." },
             { "learn.back_to_modes", "\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u0644\u0623\u0648\u0636\u0627\u0639" },
             { "learn.practice_now", "\u062a\u062f\u0631\u064a\u0628 \u0627\u0644\u0622\u0646" },
-
-            // Results
             { "results.title_win", "\u062a\u0645\u0651 \u0625\u0643\u0645\u0627\u0644 \u0627\u0644\u0645\u0633\u062a\u0648\u0649!" },
             { "results.title_lose", "\u0627\u0646\u062a\u0647\u062a \u0627\u0644\u062c\u0648\u0644\u0629!" },
             { "results.correct_format", "\u0627\u0644\u0635\u062d\u064a\u062d: {0} / {1}" },
@@ -449,8 +462,6 @@ namespace MathEdu.Utility
             { "results.error_title", "\ud83d\ude05 \u0639\u0630\u0631\u064b\u0627!" },
             { "results.error_body", "\u0644\u0645 \u0646\u062a\u0645\u0643\u0651\u0646 \u0645\u0646 \u062a\u062d\u0645\u064a\u0644 \u0646\u062a\u0627\u0626\u062c \u0627\u0644\u0645\u0633\u062a\u0648\u0649.\n\u0644\u0646\u0639\u062f \u0625\u0644\u0649 \u0627\u0644\u0642\u0627\u0626\u0645\u0629." },
             { "results.back_to_menu", "\u0627\u0644\u0639\u0648\u062f\u0629 \u0625\u0644\u0649 \u0627\u0644\u0642\u0627\u0626\u0645\u0629" },
-
-            // Settings
             { "settings.title", "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a" },
             { "settings.music", "\ud83c\udfb5  \u0627\u0644\u0645\u0648\u0633\u064a\u0642\u0649" },
             { "settings.sfx", "\ud83d\udd0a  \u0627\u0644\u0645\u0624\u062b\u0631\u0627\u062a \u0627\u0644\u0635\u0648\u062a\u064a\u0629" },
@@ -469,8 +480,6 @@ namespace MathEdu.Utility
             { "settings.pin_confirm_body", "\u0627\u0643\u062a\u0628 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0633\u0631\u0651\u064a \u0645\u0631\u0651\u0629 \u0623\u062e\u0631\u0649." },
             { "settings.reset_title", "\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0627\u0644\u062a\u0642\u062f\u0651\u0645\u061f" },
             { "settings.reset_body", "\u0645\u0637\u0644\u0648\u0628 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0633\u0631\u0651\u064a \u0644\u0644\u0648\u0627\u0644\u062f\u064a\u0646." },
-
-            // Parental dashboard
             { "parental.title", "\u0644\u0648\u062d\u0629 \u0627\u0644\u0648\u0627\u0644\u062f\u064a\u0646" },
             { "parental.for_parents", "\ud83d\udd12 \u0644\u0644\u0648\u0627\u0644\u062f\u064a\u0646" },
             { "parental.enter_pin", "\u0623\u062f\u062e\u0644 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0633\u0631\u0651\u064a. \u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a 0000." },
@@ -502,8 +511,6 @@ namespace MathEdu.Utility
             { "parental.reset_confirm_body", "\u0627\u0643\u062a\u0628 \u0627\u0644\u0631\u0642\u0645 \u0627\u0644\u0633\u0631\u0651\u064a \u0644\u0645\u0633\u062d \u0643\u0644\u0651 \u0627\u0644\u062a\u0642\u062f\u0651\u0645." },
             { "parental.new_pin", "\u0631\u0642\u0645 \u0633\u0631\u0651\u064a \u062c\u062f\u064a\u062f \u0644\u0644\u0648\u0627\u0644\u062f\u064a\u0646" },
             { "parental.pick_pin", "\u0627\u062e\u062a\u0631 \u0631\u0642\u0645\u064b\u0627 \u0645\u0646 4 \u0625\u0644\u0649 8 \u0623\u0631\u0642\u0627\u0645." },
-
-            // Badges (pretty names)
             { "badge.first_step", "\ud83c\udf31 \u0627\u0644\u062e\u0637\u0648\u0629 \u0627\u0644\u0623\u0648\u0644\u0649" },
             { "badge.half_way", "\ud83d\udee4 \u0645\u0646\u062a\u0635\u0641 \u0627\u0644\u0637\u0631\u064a\u0642" },
             { "badge.speed_demon", "\u26a1 \u0634\u064a\u0637\u0627\u0646 \u0627\u0644\u0633\u0631\u0639\u0629" },
@@ -511,7 +518,7 @@ namespace MathEdu.Utility
             { "badge.early_bird", "\ud83c\udf05 \u0627\u0644\u0641\u062c\u0631 \u0627\u0644\u0645\u0628\u0643\u0651\u0631" },
             { "badge.dedicated", "\ud83d\udcc5 \u0645\u0644\u062a\u0632\u0645" },
             { "badge.apprentice_fmt", "\ud83c\udf93 \u0645\u062a\u062f\u0631\u0651\u0628 {0} (\u0627\u0644\u0635\u0641 {1})" },
-            { "badge.master_fmt", "\ud83c\udfc6 \u062e\u0628\u064a\u0631 {0} (\u0627\u0644\u0635\u0641 {1})" },
+            { "badge.master_fmt", "\ud83c\udfc6 \u062e\u0628\u064a\r {0} (\u0627\u0644\u0635\u0641 {1})" },
         };
     }
 }
