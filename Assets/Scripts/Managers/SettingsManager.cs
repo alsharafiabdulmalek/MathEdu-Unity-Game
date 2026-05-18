@@ -53,7 +53,8 @@ namespace MathEdu.Managers
             UIFactory.CreateText(header, Localization.T("settings.title"), 64, Color.white,
                 TextAlignmentOptions.Center, "Title").fontStyle = FontStyles.Bold;
 
-            var back = UIFactory.CreateIconButton(header, "<", new Color(0, 0, 0, 0.35f), "Back");
+            var back = IconService.IconButton(header, "back", "<",
+                new Color(0, 0, 0, 0.35f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
             brt.anchoredPosition = new Vector2(80, 0);
@@ -72,13 +73,13 @@ namespace MathEdu.Managers
 
             var content = scroll.content;
 
-            BuildSection(content, Localization.T("settings.music"),
+            BuildSection(content, Localization.T("settings.music"), "musicOn", "🎵",
                 _profile.musicOn, _profile.musicVolume,
                 onToggle: v => { _profile.musicOn = v; ApplyVolumes(); Save(); },
                 onSlider: v => { _profile.musicVolume = v; ApplyVolumes(); Save(); },
                 out _musicToggle, out _musicSlider);
 
-            BuildSection(content, Localization.T("settings.sfx"),
+            BuildSection(content, Localization.T("settings.sfx"), "soundOn", "🔊",
                 _profile.sfxOn, _profile.sfxVolume,
                 onToggle: v =>
                 {
@@ -90,7 +91,8 @@ namespace MathEdu.Managers
                 onSlider: v => { _profile.sfxVolume = v; ApplyVolumes(); Save(); },
                 out _sfxToggle, out _sfxSlider);
 
-            BuildToggleRow(content, Localization.T("settings.haptics"), _profile.hapticsOn,
+            BuildToggleRow(content, Localization.T("settings.haptics"), "heart", "📳",
+                _profile.hapticsOn,
                 v => { _profile.hapticsOn = v; Save(); }, out _hapticsToggle);
 
             BuildLanguageRow(content);
@@ -113,6 +115,7 @@ namespace MathEdu.Managers
         }
 
         private static void BuildSection(RectTransform parent, string title,
+            string iconKey, string fallbackGlyph,
             bool toggleInitial, float sliderInitial,
             System.Action<bool> onToggle, System.Action<float> onSlider,
             out ToggleSwitch toggle, out Slider slider)
@@ -122,7 +125,7 @@ namespace MathEdu.Managers
             row.transform.SetParent(parent, false);
             var rt = (RectTransform)row.transform;
             var le = row.GetComponent<LayoutElement>();
-            le.preferredHeight = 200; le.minHeight = 180;
+            le.preferredHeight = 220; le.minHeight = 200;
 
             var titleRow = new GameObject("TitleRow",
                 typeof(RectTransform), typeof(HorizontalLayoutGroup));
@@ -132,8 +135,10 @@ namespace MathEdu.Managers
             trt.offsetMin = Vector2.zero; trt.offsetMax = Vector2.zero;
             var thl = titleRow.GetComponent<HorizontalLayoutGroup>();
             thl.spacing = 16;
-            thl.childForceExpandWidth = true;
+            thl.childForceExpandWidth = false;
             thl.childAlignment = TextAnchor.MiddleLeft;
+
+            AddIconOrGlyph((RectTransform)titleRow.transform, iconKey, fallbackGlyph, 56);
 
             var titleTxt = UIFactory.CreateText((RectTransform)titleRow.transform, title, 40,
                 UIFactory.TextDark,
@@ -155,7 +160,8 @@ namespace MathEdu.Managers
             slider.onValueChanged.AddListener(v => onSlider?.Invoke(v));
         }
 
-        private static void BuildToggleRow(RectTransform parent, string title, bool initial,
+        private static void BuildToggleRow(RectTransform parent, string title,
+            string iconKey, string fallbackGlyph, bool initial,
             System.Action<bool> onChanged, out ToggleSwitch toggle)
         {
             var row = new GameObject("Row_" + title,
@@ -163,10 +169,12 @@ namespace MathEdu.Managers
             row.transform.SetParent(parent, false);
             var hl = row.GetComponent<HorizontalLayoutGroup>();
             hl.spacing = 16;
-            hl.childForceExpandWidth = true;
+            hl.childForceExpandWidth = false;
             hl.childAlignment = TextAnchor.MiddleLeft;
             var le = row.GetComponent<LayoutElement>();
             le.preferredHeight = 100; le.minHeight = 100;
+
+            AddIconOrGlyph((RectTransform)row.transform, iconKey, fallbackGlyph, 56);
 
             var lbl = UIFactory.CreateText((RectTransform)row.transform, title, 40,
                 UIFactory.TextDark,
@@ -180,6 +188,31 @@ namespace MathEdu.Managers
             var tle = toggle.gameObject.AddComponent<LayoutElement>();
             tle.preferredWidth = 200; tle.preferredHeight = 90;
             toggle.onValueChanged += b => onChanged?.Invoke(b);
+        }
+
+        /// <summary>Prepend an icon (sprite-first, glyph fallback) to a layout row.</summary>
+        private static void AddIconOrGlyph(RectTransform parent, string key, string glyph, float size)
+        {
+            var sprite = IconService.Get(key);
+            if (sprite != null)
+            {
+                var go = new GameObject("Icon", typeof(Image), typeof(LayoutElement));
+                go.transform.SetParent(parent, false);
+                var img = go.GetComponent<Image>();
+                img.sprite = sprite;
+                img.preserveAspect = true;
+                img.color = UIFactory.TextDark;
+                img.raycastTarget = false;
+                var le = go.GetComponent<LayoutElement>();
+                le.preferredWidth = size; le.preferredHeight = size;
+            }
+            else
+            {
+                var txt = UIFactory.CreateText(parent, glyph, (int)(size * 0.8f),
+                    UIFactory.TextDark, TextAlignmentOptions.Center, "IconGlyph");
+                var le = txt.gameObject.AddComponent<LayoutElement>();
+                le.preferredWidth = size; le.preferredHeight = size;
+            }
         }
 
         // -------------------------------------------------------------------
