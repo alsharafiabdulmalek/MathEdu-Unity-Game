@@ -20,6 +20,7 @@
 //   - Adds a Back button with "Quit this level?" confirmation and a Pause
 //     button (configurable per mode).
 //   - Fires VFXManager prefabs on correct / wrong (Epic Toon FX support).
+//   - Spawns a ReactionFace puck that reacts in real time to correct/wrong/streak.
 // -----------------------------------------------------------------------------
 
 using System.Collections;
@@ -69,6 +70,7 @@ namespace MathEdu.Gameplay
         protected int _maxStreak;
         protected bool _locked;
         protected bool _finished;
+        protected ReactionFace _reactionFace;
 
         protected float _sessionStartTime;
 
@@ -169,7 +171,7 @@ namespace MathEdu.Gameplay
                 .fontStyle = FontStyles.Bold;
 
             // Back button (with "Quit this level?" confirmation).
-            var back = UIFactory.CreateIconButton(header, "<",
+            var back = IconService.IconButton(header, "back", "<",
                 new Color(0, 0, 0, 0.3f), "Back");
             var brt = (RectTransform)back.transform;
             brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f);
@@ -180,7 +182,7 @@ namespace MathEdu.Gameplay
             // Pause button (top-right).
             if (AllowPause)
             {
-                var pause = UIFactory.CreateIconButton(header, "II",
+                var pause = IconService.IconButton(header, "pause", "II",
                     new Color(0, 0, 0, 0.3f), "Pause");
                 var prt = (RectTransform)pause.transform;
                 prt.anchorMin = prt.anchorMax = new Vector2(1, 0.5f);
@@ -209,6 +211,14 @@ namespace MathEdu.Gameplay
 
             _scoreLabel = UIFactory.CreateText((RectTransform)stripLayout.transform,
                 "Score: 0", 36, Color.white, TextAlignmentOptions.Right, "ScoreLabel");
+
+            // Reaction face — a friendly mascot puck that reacts in real time.
+            // Positioned above the question card on the right so it never
+            // overlaps the question text.
+            _reactionFace = ReactionFace.Spawn(safe,
+                anchorMin: new Vector2(0.78f, 0.78f),
+                anchorMax: new Vector2(0.78f, 0.78f),
+                size: 180f);
 
             // Question card
             var card = UIFactory.CreatePanel(safe,
@@ -331,7 +341,12 @@ namespace MathEdu.Gameplay
                 GameManager.Instance.Audio.PlaySFX("correct");
                 GameManager.Instance.VFX?.PlayCorrect();
                 HapticManager.Light();
-                _feedback.ShowCorrect(EncouragementCorrect());
+                _feedback.ShowCorrect(EncouragementCorrect(_currentStreak), _currentStreak);
+                if (_reactionFace != null)
+                {
+                    if (_currentStreak >= 3) _reactionFace.Cheer();
+                    else                     _reactionFace.Happy();
+                }
                 OnCorrect(q);
             }
             else
@@ -341,6 +356,7 @@ namespace MathEdu.Gameplay
                 GameManager.Instance.Audio.PlaySFX("wrong");
                 GameManager.Instance.VFX?.PlayWrong();
                 _feedback.ShowWrong(EncouragementWrong(q));
+                if (_reactionFace != null) _reactionFace.Sad();
                 OnWrong(q);
                 if (StopOnFirstWrong)
                 {
@@ -559,8 +575,12 @@ namespace MathEdu.Gameplay
             };
         }
 
-        protected static string EncouragementCorrect()
+        protected static string EncouragementCorrect(int streak = 0)
         {
+            // Special-case streak milestones with extra-celebratory copy.
+            if (streak >= 10) return "Incredible!";
+            if (streak >= 5)  return "On fire!";
+            if (streak >= 3)  return "Streak!";
             string[] msgs = { "Correct!", "Great job!", "You got it!", "Awesome!", "Brilliant!", "Yes!" };
             return msgs[Random.Range(0, msgs.Length)];
         }
