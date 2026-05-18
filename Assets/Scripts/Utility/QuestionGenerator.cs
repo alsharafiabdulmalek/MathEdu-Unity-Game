@@ -3,23 +3,23 @@
 // -----------------------------------------------------------------------------
 // Procedural generator that produces curriculum-correct math question sets
 // for grades 1-3. Used by:
-//   • The editor menu "MathEdu / Build Default Database" to populate the
+//   * The editor menu "MathEdu / Build Default Database" to populate the
 //     bundled ScriptableObjects in one click.
-//   • The runtime fallback inside DatabaseBootstrapper, so the game still
+//   * The runtime fallback inside DatabaseBootstrapper, so the game still
 //     ships content even if no .asset files were authored.
 //
-// Difficulty ladder (per subject, applies wherever it makes sense):
-//   • L1–L5   : single-digit, concrete-object prompts (apples, balls).
-//   • L6–L10  : double-digit, abstract numbers.
-//   • L11–L15 : single-step word problems with named characters.
-//   • L16–L19 : two-operation word problems.
-//   • L20     : three-step "challenge" problems using the grade's max range
-//               (Grade 1 max 100, Grade 2 max 999, Grade 3 max 9999).
+// All player-facing strings (prompts, hints, explanations, items, names,
+// shape names, etc.) flow through `QuestionStrings.*`, which switches on
+// `Localization.IsRTL` and returns either English or Arabic text. So every
+// question this generator produces is in the player's current language.
 //
-// Wrong options at L11+ are deliberately plausible:
-//   • The arithmetic answer if the player forgets to carry.
-//   • The result of doing one fewer operation than required.
-//   • The result of reversing the operation (add → subtract, etc.).
+// Difficulty ladder (per subject, applies wherever it makes sense):
+//   * L1-L5   : single-digit, concrete-object prompts (apples, balls).
+//   * L6-L10  : double-digit, abstract numbers.
+//   * L11-L15 : single-step word problems with named characters.
+//   * L16-L19 : two-operation word problems.
+//   * L20     : three-step "challenge" problems using the grade's max range
+//               (Grade 1 max 100, Grade 2 max 999, Grade 3 max 9999).
 // -----------------------------------------------------------------------------
 
 using System;
@@ -94,79 +94,19 @@ namespace MathEdu.Utility
         }
 
         public static string LessonIntro(int grade, MathSubject subject) =>
-            $"Welcome to {Pretty(subject)} for Grade {grade}! " +
-            "Read each question, look at the example, then choose the best answer.";
+            QuestionStrings.LessonIntro(grade, subject);
 
-        public static string LessonExample(int grade, MathSubject subject, int level)
-        {
-            switch (subject)
-            {
-                case MathSubject.Counting:    return "Example: 1, 2, 3, ___. The next number is 4.";
-                case MathSubject.Addition:    return grade == 1 ? "Example: 2 + 3 = 5."
-                                                  : grade == 2 ? "Example: 24 + 13 = 37."
-                                                               : "Example: 245 + 138 = 383.";
-                case MathSubject.Subtraction: return grade == 1 ? "Example: 5 - 2 = 3."
-                                                  : grade == 2 ? "Example: 47 - 12 = 35."
-                                                               : "Example: 642 - 215 = 427.";
-                case MathSubject.Multiplication: return grade == 2
-                    ? "Example: 2 x 4 = 8 (two groups of four)."
-                    : "Example: 6 x 7 = 42.";
-                case MathSubject.Division:    return "Example: 12 / 3 = 4 (twelve shared into 3 groups).";
-                case MathSubject.Shapes:      return "Example: A shape with 3 sides is a triangle.";
-                case MathSubject.Patterns:    return "Example: A, B, A, B, A, ___. Next is B.";
-                case MathSubject.Fractions:   return grade == 2 ? "Example: 1/2 means one of two equal parts."
-                                                                : "Example: 2/4 is the same as 1/2.";
-                case MathSubject.Measurement: return "Example: A pencil is shorter than a desk.";
-                case MathSubject.Time:        return grade == 1
-                    ? "Example: When the long hand is on 12 and the short hand is on 3, it is 3 o'clock."
-                    : "Example: 3:15 means 15 minutes past 3.";
-                case MathSubject.Money:       return "Example: A nickel = 5 cents, a dime = 10 cents.";
-                default: return string.Empty;
-            }
-        }
+        public static string LessonExample(int grade, MathSubject subject, int level) =>
+            QuestionStrings.LessonExample(grade, subject);
 
-        public static string LessonTip(MathSubject subject)
-        {
-            switch (subject)
-            {
-                case MathSubject.Addition:       return "Tip: Count up from the bigger number.";
-                case MathSubject.Subtraction:    return "Tip: Count back, or think of the missing addend.";
-                case MathSubject.Multiplication: return "Tip: Multiplication is repeated addition.";
-                case MathSubject.Division:       return "Tip: Think 'how many groups?'.";
-                case MathSubject.Fractions:      return "Tip: The bottom number is how many equal parts.";
-                case MathSubject.Shapes:         return "Tip: Count the sides and corners.";
-                case MathSubject.Patterns:       return "Tip: Look for the part that repeats.";
-                case MathSubject.Time:           return "Tip: The short hand shows the hour.";
-                case MathSubject.Money:          return "Tip: 100 cents make 1 dollar.";
-                case MathSubject.Measurement:    return "Tip: Match the unit to the size of the object.";
-                case MathSubject.Counting:       return "Tip: Whisper-count out loud.";
-                default:                         return "Tip: Take your time and read carefully.";
-            }
-        }
+        public static string LessonTip(MathSubject subject) => QuestionStrings.LessonTip(subject);
 
-        public static string Pretty(MathSubject s) => s switch
-        {
-            MathSubject.Counting       => "Counting",
-            MathSubject.Addition       => "Addition",
-            MathSubject.Subtraction    => "Subtraction",
-            MathSubject.Multiplication => "Multiplication",
-            MathSubject.Division       => "Division",
-            MathSubject.Shapes         => "Shapes",
-            MathSubject.Patterns       => "Patterns",
-            MathSubject.Fractions      => "Fractions",
-            MathSubject.Measurement    => "Measurement",
-            MathSubject.Time           => "Time",
-            MathSubject.Money          => "Money",
-            _                          => s.ToString()
-        };
+        /// <summary>Language-aware pretty name for a subject.</summary>
+        public static string Pretty(MathSubject s) => QuestionStrings.SubjectPretty(s);
 
         // -------------------------------------------------------------------
         // Generators (with L11+ word problems + scaffolded hints)
         // -------------------------------------------------------------------
-
-        // Named children used in word problems so the prompts read like stories.
-        private static readonly string[] NamesA = { "Sam", "Ava", "Leo", "Maya", "Owen", "Zoe", "Kai", "Mia" };
-        private static readonly string[] NamesB = { "Alex", "Lily", "Noah", "Aria", "Mateo", "Ivy", "Ren", "Eli" };
 
         private static List<MathQuestion> Counting(int grade, int level, System.Random rng)
         {
@@ -184,10 +124,10 @@ namespace MathEdu.Utility
                 int answer = start + skip * 3;
                 var q = new MathQuestion
                 {
-                    prompt      = $"What comes next?\n{start}, {start + skip}, {start + skip * 2}, ?",
+                    prompt      = QuestionStrings.WhatComesNext(start, start + skip, start + skip * 2),
                     options     = SafeNonNegOptions(answer, Mathf.Max(1, skip), rng),
-                    hint        = $"Skip-count by {skip}.",
-                    explanation = $"Each step adds {skip}.",
+                    hint        = QuestionStrings.SkipCountBy(skip),
+                    explanation = QuestionStrings.EachStepAdds(skip),
                     difficulty  = ScaleDifficulty(level),
                     visual      = QuestionVisual.NumberLine
                 };
@@ -209,13 +149,13 @@ namespace MathEdu.Utility
                 {
                     int a = rng.Next(1, 6), b = rng.Next(1, 6);
                     int ans = a + b;
-                    string item = PickObject(rng);
+                    string item = QuestionStrings.Item(rng.Next(QuestionStrings.ItemCount));
                     q = new MathQuestion
                     {
-                        prompt      = $"You have {a} {item} and get {b} more. How many now?",
+                        prompt      = QuestionStrings.YouHaveAndGetMore(a, item, b),
                         options     = SafeNonNegOptions(ans, 2, rng),
-                        hint        = $"Start at {Math.Max(a, b)} and count up by {Math.Min(a, b)}.",
-                        explanation = $"{a} + {b} = {ans}.",
+                        hint        = QuestionStrings.StartAtAndCountUp(Math.Max(a, b), Math.Min(a, b)),
+                        explanation = QuestionStrings.AddFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level),
                         visual      = grade == 1 ? QuestionVisual.Dots : QuestionVisual.TextOnly,
                         visualPayload = grade == 1 ? new[] { a, b } : Array.Empty<int>()
@@ -231,32 +171,32 @@ namespace MathEdu.Utility
                     {
                         prompt      = $"{a} + {b} = ?",
                         options     = SafeNonNegOptions(ans, Mathf.Max(2, cap / 10), rng),
-                        hint        = $"Start at {Math.Max(a, b)} and count up by {Math.Min(a, b)}.",
-                        explanation = $"{a} + {b} = {ans}.",
+                        hint        = QuestionStrings.StartAtAndCountUp(Math.Max(a, b), Math.Min(a, b)),
+                        explanation = QuestionStrings.AddFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level),
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
                 else if (level <= 15)
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int cap = grade == 1 ? 30 : grade == 2 ? 99 : 500;
                     int a = rng.Next(5, cap), b = rng.Next(2, cap / 2 + 1);
                     int ans = a + b;
                     q = new MathQuestion
                     {
-                        prompt      = $"{name} has {a} stickers and earns {b} more. How many does {name} have now?",
+                        prompt      = QuestionStrings.NameStickers(name, a, b),
                         options     = WordOptions(ans, new[] { a - b, a, b, ans + 10 }, rng),
-                        hint        = $"Add: {a} + {b}.",
-                        explanation = $"{a} + {b} = {ans}.",
+                        hint        = QuestionStrings.AddOf(a, b),
+                        explanation = QuestionStrings.AddFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
                 else if (level <= 19)
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
-                    string friend = NamesB[rng.Next(NamesB.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
+                    string friend = QuestionStrings.NameB(rng.Next(QuestionStrings.NameCount));
                     int cap = grade == 1 ? 30 : grade == 2 ? 150 : 800;
                     int a = rng.Next(10, cap);
                     int gave = rng.Next(1, a / 2);
@@ -264,11 +204,10 @@ namespace MathEdu.Utility
                     int ans = a - gave + got;
                     q = new MathQuestion
                     {
-                        prompt      =
-                            $"{name} has {a} marbles. {name} gives {gave} to {friend} and then finds {got} more. How many does {name} have now?",
+                        prompt      = QuestionStrings.NameMarbles(name, a, gave, friend, got),
                         options     = WordOptions(ans,
                             new[] { a + got, a - gave, a + gave - got, ans + gave }, rng),
-                        hint        = "Step 1: subtract what was given away.\nStep 2: add the new ones.",
+                        hint        = QuestionStrings.TwoStepHint(),
                         explanation = $"{a} - {gave} + {got} = {ans}.",
                         difficulty  = ScaleDifficulty(level)
                     };
@@ -276,7 +215,7 @@ namespace MathEdu.Utility
                 }
                 else
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int cap = maxByGrade;
                     int a = rng.Next(cap / 3, cap / 2);
                     int b = rng.Next(cap / 10, cap / 4);
@@ -284,12 +223,10 @@ namespace MathEdu.Utility
                     int ans = a + b - c;
                     q = new MathQuestion
                     {
-                        prompt      =
-                            $"{name}'s allowance is {a}c. {name} earns {b}c extra and spends {c}c. How many cents does {name} have?",
+                        prompt      = QuestionStrings.Allowance(name, a, b, c),
                         options     = WordOptions(ans,
                             new[] { a + b + c, a - b - c, a + b, ans + c }, rng),
-                        hint        =
-                            $"Step 1: add the bonus ({a} + {b}).\nStep 2: subtract the spending ({c}).\nStep 3: that's the answer.",
+                        hint        = QuestionStrings.AllowanceHint(a, b, c),
                         explanation = $"{a} + {b} - {c} = {ans}.",
                         difficulty  = QuestionDifficulty.VeryHard
                     };
@@ -311,13 +248,13 @@ namespace MathEdu.Utility
                 {
                     int a = rng.Next(3, 10), b = rng.Next(1, a);
                     int ans = a - b;
-                    string item = PickObject(rng);
+                    string item = QuestionStrings.Item(rng.Next(QuestionStrings.ItemCount));
                     q = new MathQuestion
                     {
-                        prompt      = $"You have {a} {item} and give away {b}. How many left?",
+                        prompt      = QuestionStrings.YouHaveGiveAway(a, item, b),
                         options     = SafeNonNegOptions(ans, 2, rng),
-                        hint        = $"Count back {b} from {a}.",
-                        explanation = $"{a} - {b} = {ans}.",
+                        hint        = QuestionStrings.CountBackFrom(b, a),
+                        explanation = QuestionStrings.SubFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level),
                         visual      = grade == 1 ? QuestionVisual.Dots : QuestionVisual.TextOnly,
                         visualPayload = grade == 1 ? new[] { a, b } : Array.Empty<int>()
@@ -333,31 +270,31 @@ namespace MathEdu.Utility
                     {
                         prompt      = $"{a} - {b} = ?",
                         options     = SafeNonNegOptions(ans, Mathf.Max(2, cap / 10), rng),
-                        hint        = $"Count back {b} from {a}.",
-                        explanation = $"{a} - {b} = {ans}.",
+                        hint        = QuestionStrings.CountBackFrom(b, a),
+                        explanation = QuestionStrings.SubFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
                 else if (level <= 15)
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int cap = grade == 1 ? 30 : grade == 2 ? 99 : 500;
                     int a = rng.Next(10, cap), b = rng.Next(2, a - 1);
                     int ans = a - b;
                     q = new MathQuestion
                     {
-                        prompt      = $"{name} had {a} cookies and ate {b}. How many are left?",
+                        prompt      = QuestionStrings.NameCookies(name, a, b),
                         options     = WordOptions(ans, new[] { a + b, b, a, ans + b }, rng),
-                        hint        = $"Subtract: {a} - {b}.",
-                        explanation = $"{a} - {b} = {ans}.",
+                        hint        = QuestionStrings.SubtractOf(a, b),
+                        explanation = QuestionStrings.SubFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
                 else if (level <= 19)
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int cap = grade == 1 ? 50 : grade == 2 ? 200 : 800;
                     int a = rng.Next(cap / 2, cap);
                     int spend1 = rng.Next(5, a / 3);
@@ -365,10 +302,10 @@ namespace MathEdu.Utility
                     int ans = a - spend1 - spend2;
                     q = new MathQuestion
                     {
-                        prompt      = $"{name} has {a} cents. {name} spends {spend1}c on stickers and {spend2}c on a snack. How many cents are left?",
+                        prompt      = QuestionStrings.NameSpends(name, a, spend1, spend2),
                         options     = WordOptions(ans,
                             new[] { a + spend1 + spend2, a - spend1, a - spend2, ans + spend2 }, rng),
-                        hint        = "Step 1: subtract the stickers cost.\nStep 2: subtract the snack cost.",
+                        hint        = QuestionStrings.SpendStepHint(),
                         explanation = $"{a} - {spend1} - {spend2} = {ans}.",
                         difficulty  = ScaleDifficulty(level)
                     };
@@ -376,7 +313,7 @@ namespace MathEdu.Utility
                 }
                 else
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int cap = maxByGrade;
                     int a = rng.Next(cap / 2, cap);
                     int b = rng.Next(cap / 10, cap / 4);
@@ -384,10 +321,10 @@ namespace MathEdu.Utility
                     int ans = a - b - c;
                     q = new MathQuestion
                     {
-                        prompt      = $"{name} starts with {a} points. {name} loses {b} on round one and {c} on round two. What's the final score?",
+                        prompt      = QuestionStrings.NamePoints(name, a, b, c),
                         options     = WordOptions(ans,
                             new[] { a - b, a - c, a + b - c, ans + b }, rng),
-                        hint        = $"Step 1: subtract the first loss ({a} - {b}).\nStep 2: subtract the second loss ({c}).",
+                        hint        = QuestionStrings.PointsHint(a, b, c),
                         explanation = $"{a} - {b} - {c} = {ans}.",
                         difficulty  = QuestionDifficulty.VeryHard
                     };
@@ -414,13 +351,13 @@ namespace MathEdu.Utility
                     int a = grade == 2 ? grade2Tables[(level - 1) % grade2Tables.Length] : rng.Next(2, 6);
                     int b = rng.Next(1, 6);
                     int ans = a * b;
-                    string item = PickObject(rng);
+                    string item = QuestionStrings.Item(rng.Next(QuestionStrings.ItemCount));
                     q = new MathQuestion
                     {
-                        prompt      = $"You have {a} bags with {b} {item} in each. How many in total?",
+                        prompt      = QuestionStrings.BagsItems(a, b, item),
                         options     = SafeNonNegOptions(ans, Math.Max(2, ans / 4), rng),
-                        hint        = $"{a} groups of {b}.",
-                        explanation = $"{a} x {b} = {ans}.",
+                        hint        = QuestionStrings.GroupsOf(a, b),
+                        explanation = QuestionStrings.MulFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -434,23 +371,23 @@ namespace MathEdu.Utility
                     {
                         prompt      = $"{a} x {b} = ?",
                         options     = SafeNonNegOptions(ans, Math.Max(2, ans / 4), rng),
-                        hint        = $"Think of {a} groups of {b}.",
-                        explanation = $"{a} x {b} = {ans}.",
+                        hint        = QuestionStrings.ThinkGroupsOf(a, b),
+                        explanation = QuestionStrings.MulFormula(a, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
                 else if (level <= 15)
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int rows = rng.Next(2, 7), each = rng.Next(2, maxFactor + 1);
                     int ans = rows * each;
                     q = new MathQuestion
                     {
-                        prompt      = $"{name} planted {rows} rows of {each} flowers. How many flowers in all?",
+                        prompt      = QuestionStrings.FlowerRows(name, rows, each),
                         options     = WordOptions(ans, new[] { rows + each, rows * each + each, rows * (each - 1), ans + rows }, rng),
-                        hint        = $"Multiply: {rows} × {each}.",
-                        explanation = $"{rows} × {each} = {ans}.",
+                        hint        = QuestionStrings.MultiplyOf(rows, each),
+                        explanation = $"{rows} x {each} = {ans}.",
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -462,11 +399,11 @@ namespace MathEdu.Utility
                     int ans = a * boxesA + b * boxesB;
                     q = new MathQuestion
                     {
-                        prompt      = $"A shop sells {boxesA} boxes of {a} crayons and {boxesB} boxes of {b} crayons. How many crayons in total?",
+                        prompt      = QuestionStrings.CrayonBoxes(boxesA, a, boxesB, b),
                         options     = WordOptions(ans,
                             new[] { a * boxesA, b * boxesB, ans - 10, ans + a }, rng),
-                        hint        = $"Step 1: {boxesA} × {a}.\nStep 2: {boxesB} × {b}.\nStep 3: add the two totals.",
-                        explanation = $"{boxesA}×{a} + {boxesB}×{b} = {ans}.",
+                        hint        = QuestionStrings.CrayonHint(boxesA, a, boxesB, b),
+                        explanation = QuestionStrings.CrayonExplain(boxesA, a, boxesB, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -477,11 +414,11 @@ namespace MathEdu.Utility
                     int ans = a * b + c * b;
                     q = new MathQuestion
                     {
-                        prompt      = $"A bakery makes {a} buns and {c} more buns. Each tray holds {b} buns. How many buns total fit on the trays?",
+                        prompt      = QuestionStrings.BakeryBuns(a, c, b),
                         options     = WordOptions(ans,
                             new[] { (a + c) * b - b, a * b, c * b, ans + b }, rng),
-                        hint        = $"Step 1: add the buns ({a} + {c}).\nStep 2: multiply by {b}.",
-                        explanation = $"({a} + {c}) × {b} = {ans}.",
+                        hint        = QuestionStrings.BakeryHint(a, c, b),
+                        explanation = QuestionStrings.BakeryExplain(a, c, b, ans),
                         difficulty  = QuestionDifficulty.VeryHard
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -507,24 +444,24 @@ namespace MathEdu.Utility
                     {
                         prompt      = $"{a} / {b} = ?",
                         options     = SafeNonNegOptions(ans, Math.Max(1, ans / 2 + 1), rng),
-                        hint        = $"How many groups of {b} make {a}?",
-                        explanation = $"{a} / {b} = {ans} (because {b} x {ans} = {a}).",
+                        hint        = QuestionStrings.HowManyGroups(b, a),
+                        explanation = QuestionStrings.DivExplain(a, b, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
                 }
                 else if (level <= 15)
                 {
-                    string name = NamesA[rng.Next(NamesA.Length)];
+                    string name = QuestionStrings.NameA(rng.Next(QuestionStrings.NameCount));
                     int friends = rng.Next(2, 6);
                     int each    = rng.Next(2, 9);
                     int total   = friends * each;
                     q = new MathQuestion
                     {
-                        prompt      = $"{name} shares {total} candies equally among {friends} friends. How many candies does each friend get?",
+                        prompt      = QuestionStrings.ShareCandies(name, total, friends),
                         options     = WordOptions(each, new[] { total - friends, friends + each, total / 2, each + 1 }, rng),
-                        hint        = $"Divide {total} by {friends}.",
-                        explanation = $"{total} / {friends} = {each}.",
+                        hint        = QuestionStrings.DivideBy(total, friends),
+                        explanation = QuestionStrings.DivFormula(total, friends, each),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, each.ToString());
@@ -539,9 +476,9 @@ namespace MathEdu.Utility
                     int ans = each + extra;
                     q = new MathQuestion
                     {
-                        prompt      = $"{total} students board {groups} buses equally, then {extra} more students join each bus. How many students per bus now?",
+                        prompt      = QuestionStrings.StudentsBuses(total, groups, extra),
                         options     = WordOptions(ans, new[] { each, total / groups - extra, extra, ans + groups }, rng),
-                        hint        = $"Step 1: divide ({total} / {groups}).\nStep 2: add {extra}.",
+                        hint        = QuestionStrings.DivStepHint(total, groups, extra),
                         explanation = $"{total} / {groups} + {extra} = {ans}.",
                         difficulty  = ScaleDifficulty(level)
                     };
@@ -557,9 +494,9 @@ namespace MathEdu.Utility
                     int ans = each - taken;
                     q = new MathQuestion
                     {
-                        prompt      = $"A farm packs {total} eggs into {groups} crates evenly. Then {taken} eggs are removed from each crate. How many remain per crate?",
+                        prompt      = QuestionStrings.FarmEggs("", total, groups, taken),
                         options     = WordOptions(ans, new[] { each, taken, total / groups + taken, ans + taken }, rng),
-                        hint        = $"Step 1: divide {total} by {groups}.\nStep 2: subtract {taken}.",
+                        hint        = QuestionStrings.EggsStepHint(total, groups, taken),
                         explanation = $"{total} / {groups} - {taken} = {ans}.",
                         difficulty  = QuestionDifficulty.VeryHard
                     };
@@ -572,9 +509,11 @@ namespace MathEdu.Utility
 
         private static List<MathQuestion> Shapes(int grade, int level, System.Random rng)
         {
-            string[] shapes2D = { "Triangle", "Square", "Rectangle", "Circle", "Pentagon", "Hexagon", "Octagon" };
-            int[]    sides    = { 3, 4, 4, 0, 5, 6, 8 };
-            string[] shapes3D = { "Cube", "Sphere", "Cylinder", "Cone", "Pyramid" };
+            // English keys are the canonical shape identifier (used to look up
+            // clues / side counts); display strings come from QuestionStrings.
+            string[] shapes2DKeys = { "Triangle", "Square", "Rectangle", "Circle", "Pentagon", "Hexagon", "Octagon" };
+            int[]    sides        = { 3, 4, 4, 0, 5, 6, 8 };
+            string[] shapes3DKeys = { "Cube", "Sphere", "Cylinder", "Cone", "Pyramid" };
 
             var list = new List<MathQuestion>(QuestionsPerLevel);
             for (int i = 0; i < QuestionsPerLevel; i++)
@@ -591,15 +530,15 @@ namespace MathEdu.Utility
                     q = new MathQuestion
                     {
                         prompt      = perimeter
-                            ? $"A rectangle is {w} cm by {h} cm. What is its perimeter?"
-                            : $"A rectangle is {w} cm by {h} cm. What is its area?",
+                            ? QuestionStrings.PerimeterPrompt(w, h)
+                            : QuestionStrings.AreaPrompt(w, h),
                         options     = SafeNonNegOptions(ans, Math.Max(2, ans / 4), rng),
                         hint        = perimeter
-                            ? "Perimeter = 2 × (width + height)."
-                            : "Area = width × height.",
+                            ? QuestionStrings.PerimeterFormula()
+                            : QuestionStrings.AreaFormula(),
                         explanation = perimeter
-                            ? $"2 × ({w} + {h}) = {ans}."
-                            : $"{w} × {h} = {ans}.",
+                            ? QuestionStrings.PerimeterExplain(w, h, ans)
+                            : QuestionStrings.AreaExplain(w, h, ans),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.ShapePicker
                     };
@@ -607,28 +546,22 @@ namespace MathEdu.Utility
                 }
                 else if (grade == 2 && level > 10)
                 {
-                    int idx = rng.Next(shapes3D.Length);
-                    string answer = shapes3D[idx];
-                    var opts = new List<string>(shapes3D);
+                    int idx = rng.Next(shapes3DKeys.Length);
+                    string answerKey = shapes3DKeys[idx];
+                    string answer    = QuestionStrings.All3DShapes()[idx];
+
+                    var allLocalized = QuestionStrings.All3DShapes();
+                    var opts = new List<string>(allLocalized);
                     opts.RemoveAt(idx);
                     Shuffle(opts, rng);
                     var picks = new[] { answer, opts[0], opts[1], opts[2] };
                     Shuffle(picks, rng);
-                    string clue = answer switch
-                    {
-                        "Cube"     => "I have 6 square faces, 8 vertices, 12 edges.",
-                        "Sphere"   => "I look like a ball and have no edges.",
-                        "Cylinder" => "I have two flat circles and a curved side.",
-                        "Cone"     => "I have one flat circle and a single point.",
-                        "Pyramid"  => "I have a square base and 4 triangular faces.",
-                        _ => "Guess the 3-D shape!"
-                    };
                     q = new MathQuestion
                     {
-                        prompt      = clue,
+                        prompt      = QuestionStrings.ShapeClue3D(answerKey),
                         options     = picks,
-                        hint        = "Think of a real object that has this shape.",
-                        explanation = $"It's a {answer}.",
+                        hint        = QuestionStrings.ThinkRealObject(),
+                        explanation = QuestionStrings.ItsAShape(answer),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.ShapePicker
                     };
@@ -636,18 +569,19 @@ namespace MathEdu.Utility
                 }
                 else
                 {
-                    int idx = rng.Next(shapes2D.Length);
-                    string answer = shapes2D[idx];
+                    int idx = rng.Next(shapes2DKeys.Length);
+                    string answerKey = shapes2DKeys[idx];
+                    string answer    = QuestionStrings.All2DShapes()[idx];
                     bool sideQ = rng.Next(2) == 0;
                     if (sideQ && sides[idx] > 0)
                     {
                         int correctSides = sides[idx];
                         q = new MathQuestion
                         {
-                            prompt      = $"How many sides does a {answer.ToLower()} have?",
+                            prompt      = QuestionStrings.HowManySides(answer),
                             options     = SafeNonNegOptions(correctSides, 2, rng),
-                            hint        = "Count the straight edges.",
-                            explanation = $"A {answer.ToLower()} has {correctSides} sides.",
+                            hint        = QuestionStrings.CountSides(),
+                            explanation = QuestionStrings.ShapeHasSides(answer, correctSides),
                             difficulty  = ScaleDifficulty(level),
                             visual      = QuestionVisual.ShapePicker
                         };
@@ -655,28 +589,18 @@ namespace MathEdu.Utility
                     }
                     else
                     {
-                        var opts = new List<string>(shapes2D);
+                        var allLocalized = QuestionStrings.All2DShapes();
+                        var opts = new List<string>(allLocalized);
                         opts.Remove(answer);
                         Shuffle(opts, rng);
                         var picks = new[] { answer, opts[0], opts[1], opts[2] };
                         Shuffle(picks, rng);
-                        string clue = answer switch
-                        {
-                            "Triangle"  => "I have 3 sides and 3 corners.",
-                            "Square"    => "I have 4 equal sides.",
-                            "Rectangle" => "I have 4 sides; two long and two short.",
-                            "Circle"    => "I have no corners and I am round.",
-                            "Pentagon"  => "I have 5 sides.",
-                            "Hexagon"   => "I have 6 sides, like a honeycomb.",
-                            "Octagon"   => "I have 8 sides, like a stop sign.",
-                            _ => "Guess the shape!"
-                        };
                         q = new MathQuestion
                         {
-                            prompt      = clue,
+                            prompt      = QuestionStrings.ShapeClue2D(answerKey),
                             options     = picks,
-                            hint        = "Count my sides.",
-                            explanation = $"It's a {answer.ToLower()}.",
+                            hint        = QuestionStrings.CountMySides(),
+                            explanation = QuestionStrings.ItsAShape(answer),
                             difficulty  = ScaleDifficulty(level),
                             visual      = QuestionVisual.ShapePicker
                         };
@@ -691,7 +615,7 @@ namespace MathEdu.Utility
         private static List<MathQuestion> Patterns(int grade, int level, System.Random rng)
         {
             var list = new List<MathQuestion>(QuestionsPerLevel);
-            string[] tokens = { "🔴", "🔵", "🟢", "🟡", "🟣", "🟠", "⚪" };
+            string[] tokens = { "\ud83d\udd34", "\ud83d\udd35", "\ud83d\udfe2", "\ud83d\udfe1", "\ud83d\udfe3", "\ud83d\udfe0", "\u26aa" };
             for (int i = 0; i < QuestionsPerLevel; i++)
             {
                 MathQuestion q;
@@ -712,12 +636,12 @@ namespace MathEdu.Utility
                               : seq[3] + (4 * step);
                     q = new MathQuestion
                     {
-                        prompt      = $"Find the next number:\n{seq[0]}, {seq[1]}, {seq[2]}, {seq[3]}, ?",
+                        prompt      = QuestionStrings.FindNextNumber(seq[0], seq[1], seq[2], seq[3]),
                         options     = SafeNonNegOptions(answer, Math.Max(2, answer / 5), rng),
-                        hint        = op == 0 ? $"Each step adds {step}."
-                                    : op == 1 ? $"Each step multiplies by {step}."
-                                              : $"Each step adds a larger amount.",
-                        explanation = $"Next is {answer}.",
+                        hint        = op == 0 ? QuestionStrings.EachStepAdds(step)
+                                    : op == 1 ? QuestionStrings.EachStepMultiplies(step)
+                                              : QuestionStrings.EachStepLarger(),
+                        explanation = QuestionStrings.NextIs(answer),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Pattern
                     };
@@ -742,10 +666,10 @@ namespace MathEdu.Utility
 
                     q = new MathQuestion
                     {
-                        prompt      = $"What comes next?\n{string.Join(" ", seq)} ?",
+                        prompt      = QuestionStrings.PatternWhatComesNext(string.Join(" ", seq)),
                         options     = opts,
-                        hint        = $"The pattern repeats every {patternLen} items.",
-                        explanation = $"Pattern: {string.Join(" ", pattern)}. Next is {answer}.",
+                        hint        = QuestionStrings.PatternRepeats(patternLen),
+                        explanation = QuestionStrings.PatternExplain(string.Join(" ", pattern), answer),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Pattern
                     };
@@ -775,10 +699,10 @@ namespace MathEdu.Utility
                     Shuffle(picks, rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"Which fraction means ONE of {den} equal parts?",
+                        prompt      = QuestionStrings.WhichFractionOneOf(den),
                         options     = picks,
-                        hint        = "Look at the bottom number.",
-                        explanation = $"One of {den} equal parts is written {label}.",
+                        hint        = QuestionStrings.LookBottom(),
+                        explanation = QuestionStrings.OneOfPartsExplain(den, label),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Fraction,
                         visualPayload = new[] { num, den }
@@ -803,10 +727,10 @@ namespace MathEdu.Utility
                     Shuffle(arr, rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"Which fraction is equal to {num}/{den}?",
+                        prompt      = QuestionStrings.WhichFractionEqualTo(num, den),
                         options     = arr,
-                        hint        = $"Multiply top and bottom by {factor}.",
-                        explanation = $"{num}/{den} = {answer}.",
+                        hint        = QuestionStrings.MultiplyTopBottom(factor),
+                        explanation = QuestionStrings.FracEqExplain(num, den, answer),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Fraction,
                         visualPayload = new[] { num, den }
@@ -843,9 +767,9 @@ namespace MathEdu.Utility
                             int ans = cm / 100;
                             q = new MathQuestion
                             {
-                                prompt      = $"How many metres are in {cm} centimetres?",
+                                prompt      = QuestionStrings.HowManyMetres(cm),
                                 options     = SafeNonNegOptions(ans, 2, rng),
-                                hint        = "100 cm = 1 m. Divide by 100.",
+                                hint        = QuestionStrings.TipCm(),
                                 explanation = $"{cm} cm = {ans} m.",
                                 difficulty  = ScaleDifficulty(level)
                             };
@@ -858,9 +782,9 @@ namespace MathEdu.Utility
                             int ans = m / 1000;
                             q = new MathQuestion
                             {
-                                prompt      = $"How many kilometres are in {m} metres?",
+                                prompt      = QuestionStrings.HowManyKilometres(m),
                                 options     = SafeNonNegOptions(ans, 2, rng),
-                                hint        = "1000 m = 1 km. Divide by 1000.",
+                                hint        = QuestionStrings.TipM(),
                                 explanation = $"{m} m = {ans} km.",
                                 difficulty  = ScaleDifficulty(level)
                             };
@@ -873,9 +797,9 @@ namespace MathEdu.Utility
                             int ans = g / 1000;
                             q = new MathQuestion
                             {
-                                prompt      = $"How many kilograms are in {g} grams?",
+                                prompt      = QuestionStrings.HowManyKg(g),
                                 options     = SafeNonNegOptions(ans, 2, rng),
-                                hint        = "1000 g = 1 kg.",
+                                hint        = QuestionStrings.TipG(),
                                 explanation = $"{g} g = {ans} kg.",
                                 difficulty  = ScaleDifficulty(level)
                             };
@@ -888,9 +812,9 @@ namespace MathEdu.Utility
                             int ans = ml / 1000;
                             q = new MathQuestion
                             {
-                                prompt      = $"How many litres are in {ml} millilitres?",
+                                prompt      = QuestionStrings.HowManyLitres(ml),
                                 options     = SafeNonNegOptions(ans, 2, rng),
-                                hint        = "1000 ml = 1 l.",
+                                hint        = QuestionStrings.TipMl(),
                                 explanation = $"{ml} ml = {ans} l.",
                                 difficulty  = ScaleDifficulty(level)
                             };
@@ -908,12 +832,16 @@ namespace MathEdu.Utility
                         ("crayon", "yard stick"), ("mouse", "horse")
                     };
                     var pair = pairs[rng.Next(pairs.Length)];
+                    string sLocal = QuestionStrings.MeasureObject(pair.s);
+                    string lLocal = QuestionStrings.MeasureObject(pair.l);
                     q = new MathQuestion
                     {
-                        prompt      = $"Which is LONGER, a {pair.s} or a {pair.l}?",
-                        options     = new[] { pair.l, pair.s, "Same", "Cannot tell" },
-                        hint        = "Picture both objects.",
-                        explanation = $"The {pair.l} is longer.",
+                        prompt      = QuestionStrings.WhichLonger(pair.s, pair.l),
+                        options     = new[] { lLocal, sLocal,
+                                              QuestionStrings.MeasureSame(),
+                                              QuestionStrings.MeasureCannotTell() },
+                        hint        = QuestionStrings.PictureBoth(),
+                        explanation = QuestionStrings.LongerIs(pair.l),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.TextOnly
                     };
@@ -938,10 +866,10 @@ namespace MathEdu.Utility
                     Shuffle(opts, rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"Which unit best measures a {obj}?",
+                        prompt      = QuestionStrings.WhichUnitFor(obj),
                         options     = opts,
-                        hint        = "Pick a unit that matches the size.",
-                        explanation = $"We measure a {obj} in {unit}.",
+                        hint        = QuestionStrings.PickUnitMatchSize(),
+                        explanation = QuestionStrings.MeasureWithUnit(obj, unit),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(opts, unit);
@@ -968,10 +896,10 @@ namespace MathEdu.Utility
                     int ans = extraMinutes;
                     q = new MathQuestion
                     {
-                        prompt      = $"From {h1}:{m1:00} to {h2}:{m2:00}, how many minutes pass?",
+                        prompt      = QuestionStrings.ElapsedTime(h1, m1, h2, m2),
                         options     = SafeNonNegOptions(ans, 10, rng),
-                        hint        = "Step 1: count hours between the two times.\nStep 2: add the extra minutes.",
-                        explanation = $"{h1}:{m1:00} → {h2}:{m2:00} = {ans} minutes.",
+                        hint        = QuestionStrings.ElapsedHint(),
+                        explanation = QuestionStrings.ElapsedExplain(h1, m1, h2, m2, ans),
                         difficulty  = ScaleDifficulty(level)
                     };
                     q.correctIndex = IndexOf(q.options, ans.ToString());
@@ -1004,10 +932,10 @@ namespace MathEdu.Utility
                     Shuffle(arr, rng);
                     q = new MathQuestion
                     {
-                        prompt      = "What time is shown on the clock?",
+                        prompt      = QuestionStrings.WhatTimeShown(),
                         options     = arr,
-                        hint        = "The short hand is the hour. The long hand is the minute.",
-                        explanation = $"The clock shows {answer}.",
+                        hint        = QuestionStrings.ClockHandsHint(),
+                        explanation = QuestionStrings.ClockShows(answer),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.ClockFace,
                         visualPayload = new[] { hour, minute }
@@ -1040,22 +968,22 @@ namespace MathEdu.Utility
                     Shuffle(others, rng);
                     var opts = new[]
                     {
-                        $"{c.cents}c",
-                        $"{others[0].Item2}c",
-                        $"{others[1].Item2}c",
-                        $"{others[2].Item2}c"
+                        $"{c.cents}{QuestionStrings.CentSuffix}",
+                        $"{others[0].Item2}{QuestionStrings.CentSuffix}",
+                        $"{others[1].Item2}{QuestionStrings.CentSuffix}",
+                        $"{others[2].Item2}{QuestionStrings.CentSuffix}"
                     };
                     Shuffle(opts, rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"How many cents is a {c.name}?",
+                        prompt      = QuestionStrings.HowManyCents(c.name),
                         options     = opts,
-                        hint        = "Penny=1, Nickel=5, Dime=10, Quarter=25.",
-                        explanation = $"A {c.name} is worth {c.cents} cents.",
+                        hint        = QuestionStrings.CoinValuesHint(),
+                        explanation = QuestionStrings.CoinExplain(c.name, c.cents),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Money
                     };
-                    q.correctIndex = IndexOf(opts, $"{c.cents}c");
+                    q.correctIndex = IndexOf(opts, $"{c.cents}{QuestionStrings.CentSuffix}");
                 }
                 else if (grade == 2)
                 {
@@ -1065,20 +993,20 @@ namespace MathEdu.Utility
                     for (int k = 0; k < n; k++)
                     {
                         var c = coins[rng.Next(coins.Length)];
-                        picks.Add(c.name);
+                        picks.Add(QuestionStrings.CoinNameShort(c.name));
                         total += c.cents;
                     }
                     var opts = SafeNonNegOptions(total, Math.Max(5, total / 4), rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"Add the coins: {string.Join(" + ", picks)}. Total cents?",
+                        prompt      = QuestionStrings.AddCoins(string.Join(" + ", picks)),
                         options     = AppendCents(opts),
-                        hint        = "Add the value of each coin.",
-                        explanation = $"Total = {total} cents.",
+                        hint        = QuestionStrings.AddCoinValues(),
+                        explanation = QuestionStrings.TotalCents(total),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Money
                     };
-                    q.correctIndex = IndexOf(q.options, $"{total}c");
+                    q.correctIndex = IndexOf(q.options, $"{total}{QuestionStrings.CentSuffix}");
                 }
                 else
                 {
@@ -1089,14 +1017,14 @@ namespace MathEdu.Utility
                     var opts = SafeNonNegOptions(change, 10, rng);
                     q = new MathQuestion
                     {
-                        prompt      = $"You buy a snack for {price}c and pay {paid}c. What is your change?",
+                        prompt      = QuestionStrings.MakeChange(price, paid),
                         options     = AppendCents(opts),
-                        hint        = $"Change = {paid} - price.",
-                        explanation = $"{paid} - {price} = {change} cents.",
+                        hint        = QuestionStrings.ChangeFormula(paid),
+                        explanation = QuestionStrings.ChangeExplain(paid, price, change),
                         difficulty  = ScaleDifficulty(level),
                         visual      = QuestionVisual.Money
                     };
-                    q.correctIndex = IndexOf(q.options, $"{change}c");
+                    q.correctIndex = IndexOf(q.options, $"{change}{QuestionStrings.CentSuffix}");
                 }
                 list.Add(q);
             }
@@ -1118,12 +1046,6 @@ namespace MathEdu.Utility
 
         private static int HashSeed(int g, MathSubject s, int l)
             => g * 1_000_000 + (int)s * 1_000 + l;
-
-        private static string PickObject(System.Random rng)
-        {
-            string[] items = { "apples", "balls", "stickers", "blocks", "crayons", "marbles", "candies", "cards" };
-            return items[rng.Next(items.Length)];
-        }
 
         /// <summary>Build 4 plausible options around `answer`, always non-negative.</summary>
         private static string[] SafeNonNegOptions(int answer, int spread, System.Random rng)
@@ -1179,7 +1101,7 @@ namespace MathEdu.Utility
 
         private static string[] AppendCents(string[] arr)
         {
-            for (int i = 0; i < arr.Length; i++) arr[i] = arr[i] + "c";
+            for (int i = 0; i < arr.Length; i++) arr[i] = arr[i] + QuestionStrings.CentSuffix;
             return arr;
         }
 
