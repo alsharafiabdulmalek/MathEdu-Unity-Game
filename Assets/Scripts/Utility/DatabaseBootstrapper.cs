@@ -8,10 +8,10 @@
 // ====== LAZY BUILD (perf fix) =================================================
 //
 // BuildInMemory() creates a *skeleton* database in well under 100 ms even
-// on a constrained MacBook Air: ~571 minimal ScriptableObject instances
-// (1 Database + 3 Grades + ~27 Subjects + 540 Levels) with only their
-// identity fields populated. Questions, lesson text, and story text are
-// generated lazily on first access via GameManager.CurrentLevel.
+// on a constrained MacBook Air: a few hundred minimal ScriptableObject
+// instances (1 Database + 5 Grades + ~47 Subjects + 940 Levels) with only
+// their identity fields populated. Questions, lesson text, and story text
+// are generated lazily on first access via GameManager.CurrentLevel.
 //
 // ====== LOCALIZATION-AWARE REGENERATION =======================================
 //
@@ -31,6 +31,12 @@ namespace MathEdu.Utility
 {
     public static class DatabaseBootstrapper
     {
+        // Single point-of-truth for "how many grades the game ships". The
+        // editor menu, PlayerSetup grade picker, and Main Menu grade strip
+        // all key off this constant.
+        public const int MinGrade = 1;
+        public const int MaxGrade = 5;
+
         /// <summary>
         /// Build a skeleton MathDatabase in memory. Only identity / metadata
         /// fields are populated. Question content and lesson/story text are
@@ -42,7 +48,7 @@ namespace MathEdu.Utility
             var db = ScriptableObject.CreateInstance<MathDatabase>();
             db.name = "MathDatabase (Runtime, Lazy)";
 
-            for (int gradeNum = 1; gradeNum <= 3; gradeNum++)
+            for (int gradeNum = MinGrade; gradeNum <= MaxGrade; gradeNum++)
             {
                 var grade = ScriptableObject.CreateInstance<GradeData>();
                 grade.gradeNumber = gradeNum;
@@ -166,6 +172,8 @@ namespace MathEdu.Utility
             1 => new Color(1.00f, 0.78f, 0.36f), // warm yellow
             2 => new Color(0.56f, 0.85f, 0.55f), // mint green
             3 => new Color(0.55f, 0.70f, 0.95f), // sky blue
+            4 => new Color(0.95f, 0.55f, 0.85f), // playful pink
+            5 => new Color(0.65f, 0.45f, 0.95f), // royal purple
             _ => Color.white
         };
 
@@ -210,6 +218,8 @@ namespace MathEdu.Utility
                     1 => "\u0627\u0644\u0639\u062f\u0651\u060c \u0627\u0644\u062c\u0645\u0639 \u0648\u0627\u0644\u0637\u0631\u062d \u0627\u0644\u0628\u0633\u064a\u0637\u060c \u0627\u0644\u0623\u0634\u0643\u0627\u0644\u060c \u0648\u0627\u0644\u0648\u0642\u062a.",
                     2 => "\u0627\u0644\u0639\u062f\u0651 \u0628\u0645\u0636\u0627\u0639\u0641\u0627\u062a\u060c \u0623\u0639\u062f\u0627\u062f \u0623\u0643\u0628\u0631\u060c \u0645\u0642\u062f\u0651\u0645\u0629 \u0627\u0644\u0636\u0631\u0628\u060c \u0627\u0644\u0643\u0633\u0648\u0631.",
                     3 => "\u062d\u0633\u0627\u0628 \u0645\u062a\u0639\u062f\u0651\u062f \u0627\u0644\u0623\u0631\u0642\u0627\u0645\u060c \u062c\u062f\u0627\u0648\u0644 \u0627\u0644\u0636\u0631\u0628\u060c \u0627\u0644\u0642\u0633\u0645\u0629\u060c \u0627\u0644\u0643\u0633\u0648\u0631\u060c \u0648\u0627\u0644\u0647\u0646\u062f\u0633\u0629.",
+                    4 => "\u0623\u0639\u062f\u0627\u062f \u0643\u0628\u064a\u0631\u0629\u060c \u0627\u0644\u0642\u0633\u0645\u0629 \u0645\u0639 \u0628\u0648\u0627\u0642\u064d\u060c \u062c\u0645\u0639 \u0648\u0637\u0631\u062d \u0627\u0644\u0643\u0633\u0648\u0631\u060c \u0645\u0633\u0627\u062d\u0629 \u0627\u0644\u0645\u062b\u0644\u0651\u062b\u060c \u062a\u0635\u0646\u064a\u0641 \u0627\u0644\u0632\u0648\u0627\u064a\u0627\u060c \u0646\u0638\u0627\u0645 24 \u0633\u0627\u0639\u0629\u060c \u0648\u0641\u0648\u0627\u062a\u064a\u0631 \u0645\u062a\u0639\u062f\u0651\u062f\u0629.",
+                    5 => "\u0627\u0644\u0623\u0639\u062f\u0627\u062f \u0627\u0644\u0643\u0628\u064a\u0631\u0629\u060c \u0627\u0644\u0642\u0633\u0645\u0629 \u0627\u0644\u0645\u0637\u0648\u0651\u0644\u0629\u060c \u062c\u0645\u0639 \u0648\u0637\u0631\u062d \u0627\u0644\u0643\u0633\u0648\u0631 \u0628\u0645\u0642\u0627\u0645\u0627\u062a \u0645\u062e\u062a\u0644\u0641\u0629\u060c \u062d\u062c\u0648\u0645 \u0627\u0644\u0645\u062c\u0633\u0651\u0645\u0627\u062a\u060c \u0623\u0646\u0645\u0627\u0637 \u0627\u0644\u062d\u062f\u0651 \u0627\u0644\u0646\u0648\u0646\u064a\u060c \u0648\u0627\u0644\u0646\u0633\u0628 \u0627\u0644\u0645\u0626\u0648\u064a\u0651\u0629.",
                     _ => ""
                 };
             }
@@ -218,6 +228,8 @@ namespace MathEdu.Utility
                 1 => "Counting, simple addition & subtraction, shapes, and time.",
                 2 => "Skip counting, larger numbers, multiplication intro, fractions.",
                 3 => "Multi-digit math, tables, division, fractions and geometry.",
+                4 => "Large numbers, division with remainders, fraction add/subtract, triangle area, angle classes, 24-hour time, multi-item bills.",
+                5 => "Long division, unlike-denominator fractions, volume of solids, term-rule patterns, percentages and discounts.",
                 _ => ""
             };
         }
