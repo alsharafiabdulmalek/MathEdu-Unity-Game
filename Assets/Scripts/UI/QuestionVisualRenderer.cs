@@ -158,14 +158,23 @@ namespace MathEdu.UI
             if (q.visualPayload == null || q.visualPayload.Length < 2) return;
             int num = q.visualPayload[0];
             int den = q.visualPayload[1];
+            // Guard against malformed payloads — den == 0 would divide by
+            // zero below; den < 0 or num < 0 would render nothing useful.
+            if (den <= 0) return;
+            num = Mathf.Clamp(num, 0, den);
+            // Clamp den to a reasonable visual range so a very large
+            // denominator from a future generator doesn't produce
+            // sub-pixel-thin bars that read as a blank strip.
+            int visDen = Mathf.Min(den, 12);
 
             float totalW = 600;
             float h = 120;
-            float cellW = totalW / den;
+            float cellW = totalW / visDen;
             float startX = -totalW / 2f + cellW / 2f;
-            for (int i = 0; i < den; i++)
+            int filledCount = Mathf.Min(num, visDen);
+            for (int i = 0; i < visDen; i++)
             {
-                bool filled = i < num;
+                bool filled = i < filledCount;
                 var rt = AddImage(
                     filled ? UIFactory.Accent : Color.white,
                     DefaultSprite.RoundedRect(16),
