@@ -13,6 +13,8 @@ MonoBehaviour:
   m_Name: AvatarLibrary
   m_EditorClassIdentifier: MathEdu.Runtime::MathEdu.Data.AvatarLibrary
   avatars:
+  - {fileID: 11400000, guid: a4d31e7f9a8b14b1b9c0d7e218a2c510, type: 2}
+  - {fileID: 11400000, guid: b5e42f80ab9c25c2cad1e8f329b3d621, type: 2}
   - {fileID: 11400000, guid: ab1324a3d409b48e6b0060f6a320dabd, type: 2}
   - {fileID: 11400000, guid: da23216e2179243a59483f4e07e74bd2, type: 2}
   - {fileID: 11400000, guid: 32e3ffdc703d74f8ab8f31f87d948b3f, type: 2}
