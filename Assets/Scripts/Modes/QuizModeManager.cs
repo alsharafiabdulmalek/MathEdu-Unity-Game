@@ -10,13 +10,14 @@ using MathEdu.Data;
 using MathEdu.Gameplay;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using UnityEngine;
 
 namespace MathEdu.Modes
 {
     public class QuizModeManager : GameplayManagerBase
     {
-        protected override string HeaderTitle => "Quiz";
+        protected override string HeaderTitle => Localization.T("modesel.quiz");
         protected override Color  HeaderColor => UIFactory.Accent;
         protected override bool   ShowHint    => false;
 
@@ -75,7 +76,7 @@ namespace MathEdu.Modes
             var buttons = _answersHolder.GetComponentsInChildren<AnswerButton>();
             if (q.correctIndex >= 0 && q.correctIndex < buttons.Length)
                 buttons[q.correctIndex].FlashCorrect();
-            _feedback.ShowWrong("Time's up!", surprised: true);
+            _feedback.ShowWrong(Localization.T("gp.time_up"), surprised: true);
             if (_reactionFace != null) _reactionFace.Surprised();
             GameManager.Instance.VFX?.PlayWrong();
             StartCoroutine(AdvanceAfterDelay());

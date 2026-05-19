@@ -7,13 +7,14 @@
 
 using MathEdu.Gameplay;
 using MathEdu.UI;
+using MathEdu.Utility;
 using UnityEngine;
 
 namespace MathEdu.Modes
 {
     public class PracticeModeManager : GameplayManagerBase
     {
-        protected override string HeaderTitle => "Practice";
+        protected override string HeaderTitle => Localization.T("modesel.practice");
         protected override Color  HeaderColor => UIFactory.Success;
         protected override bool   ShowHint    => true;
     }

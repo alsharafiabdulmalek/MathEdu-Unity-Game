@@ -102,6 +102,22 @@ namespace MathEdu.Managers
 
             while (!op.isDone) yield return null;
 
+            // Route the music to the right track for the destination scene.
+            // Menu / setup / settings / parental dashboard share the calm
+            // menu loop; gameplay scenes get the slightly more upbeat
+            // gameplay loop (falls back to menu when no asset is present).
+            if (audio != null)
+            {
+                bool gameplayScene =
+                    sceneName == SceneLearn    ||
+                    sceneName == ScenePractice ||
+                    sceneName == SceneQuiz     ||
+                    sceneName == SceneStory    ||
+                    sceneName == SceneSpeed;
+                if (gameplayScene) audio.PlayGameplayMusic();
+                else               audio.PlayMenuMusic();
+            }
+
             yield return fader.FadeTo(0f, fade);
             transitionInFlight = false;
         }

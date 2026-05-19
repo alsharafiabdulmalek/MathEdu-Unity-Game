@@ -12,13 +12,14 @@ using MathEdu.Data;
 using MathEdu.Gameplay;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using UnityEngine;
 
 namespace MathEdu.Modes
 {
     public class SpeedRoundManager : GameplayManagerBase
     {
-        protected override string HeaderTitle      => "Speed Round";
+        protected override string HeaderTitle      => Localization.T("modesel.speed");
         protected override Color  HeaderColor      => UIFactory.Danger;
         protected override bool   ShowHint         => false;
         protected override bool   StopOnFirstWrong => true;
@@ -70,7 +71,7 @@ namespace MathEdu.Modes
             _wrong++;
             _currentStreak = 0;
             GameManager.Instance.Session.failedEarly = true;
-            _feedback.ShowWrong("Too slow!", surprised: true);
+            _feedback.ShowWrong(Localization.T("gp.too_slow"), surprised: true);
             if (_reactionFace != null) _reactionFace.Surprised();
             GameManager.Instance.VFX?.PlayWrong();
             StartCoroutine(FinishDelayed());

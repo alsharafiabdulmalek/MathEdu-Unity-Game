@@ -15,6 +15,7 @@
 
 using System;
 using System.Collections;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -65,7 +66,7 @@ namespace MathEdu.UI
             return ab;
         }
 
-        public void SetText(string s)   { if (_label != null) _label.text = s; }
+        public void SetText(string s)   { if (_label != null) Localization.SetText(_label, s); }
         public void SetInteractable(bool i) { if (_button != null) _button.interactable = i; }
 
         public void FlashCorrect() => StartCoroutine(Flash(UIFactory.Success, true));

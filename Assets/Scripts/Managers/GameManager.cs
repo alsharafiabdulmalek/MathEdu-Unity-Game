@@ -99,6 +99,10 @@ namespace MathEdu.Managers
 
             Audio.Init(Profile);
             VFX.Init();
+            // Start the menu music immediately so the boot/main-menu scenes
+            // never play in silence. UIManager handles swapping between menu
+            // and gameplay music on subsequent scene transitions.
+            Audio.PlayMenuMusic();
         }
 
         private void OnApplicationPause(bool paused)

@@ -14,6 +14,7 @@
 using MathEdu.Data;
 using MathEdu.Gameplay;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 
@@ -21,7 +22,7 @@ namespace MathEdu.Modes
 {
     public class StoryModeManager : GameplayManagerBase
     {
-        protected override string HeaderTitle => "Story";
+        protected override string HeaderTitle => Localization.T("modesel.story");
         protected override Color  HeaderColor => new Color(0.55f, 0.40f, 0.90f);
         protected override bool   ShowHint    => true;
         protected override bool   ShuffleQuestions => false;
@@ -38,25 +39,25 @@ namespace MathEdu.Modes
                 new Color(0.55f, 0.40f, 0.90f, 0.85f), 20, "StoryBanner");
             _storyLabel = UIFactory.CreateText(banner,
                 string.IsNullOrEmpty(_level.storyIntro)
-                    ? "A new math adventure begins!"
+                    ? Localization.T("story.intro_default")
                     : _level.storyIntro,
                 30, Color.white, TextAlignmentOptions.Center, "StoryLabel");
             _storyLabel.fontStyle = FontStyles.Italic;
 
             _outroText = string.IsNullOrEmpty(_level.storyOutro)
-                ? "Wonderful work! The story continues…"
+                ? Localization.T("story.outro_default")
                 : _level.storyOutro;
         }
 
         protected override void OnCorrect(MathQuestion q)
         {
             if (_storyLabel != null)
-                _storyLabel.text = "✨ The story moves forward…";
+                Localization.SetText(_storyLabel, Localization.T("story.moves_forward"));
         }
 
         protected override void Finish()
         {
-            if (_storyLabel != null) _storyLabel.text = _outroText;
+            if (_storyLabel != null) Localization.SetText(_storyLabel, _outroText);
             base.Finish();
         }
     }

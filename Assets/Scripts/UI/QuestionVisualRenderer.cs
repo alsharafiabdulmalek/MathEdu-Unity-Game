@@ -7,6 +7,7 @@
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -73,7 +74,7 @@ namespace MathEdu.UI
             var go = new GameObject("Label", typeof(RectTransform));
             go.transform.SetParent(_root, false);
             var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text = text;
+            tmp.text = Localization.Shape(text);
             tmp.fontSize = size;
             tmp.color = color ?? UIFactory.TextLight;
             tmp.alignment = TextAlignmentOptions.Center;
@@ -82,6 +83,7 @@ namespace MathEdu.UI
             rt.sizeDelta = new Vector2(800, 80);
             rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = pos;
+            Localization.Apply(tmp);
             return tmp;
         }
 
@@ -171,7 +173,8 @@ namespace MathEdu.UI
                     new Vector2(startX + i * cellW, 0));
                 rt.GetComponent<Image>().type = Image.Type.Sliced;
             }
-            AddLabel($"{num} of {den}", new Vector2(0, -110), 40, UIFactory.TextLight);
+            // Fraction caption: show "num / den" — universal across languages.
+            AddLabel($"{num} / {den}", new Vector2(0, -110), 40, UIFactory.TextLight);
         }
 
         private void DrawNumberLine(MathQuestion q)
