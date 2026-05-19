@@ -42,6 +42,12 @@ namespace MathEdu.Utility
         /// Generate a full question list for a given grade / subject / level.
         /// Deterministic for a given seed so saved progress can replay the
         /// same set in identical order if desired.
+        ///
+        /// SAFETY NET: every generator branch is wrapped in try/catch. If any
+        /// per-subject method throws (out-of-range RNG, division by zero,
+        /// runaway distractor loops, …) we log a clear warning and fall back
+        /// to a small set of trivially valid math questions so the gameplay
+        /// scene NEVER opens to a black screen.
         /// </summary>
         public static List<MathQuestion> Generate(
             int grade, MathSubject subject, int level, int seed = 0)
@@ -50,21 +56,93 @@ namespace MathEdu.Utility
                 ? seed
                 : HashSeed(grade, subject, level));
 
-            switch (subject)
+            List<MathQuestion> result;
+            try
             {
-                case MathSubject.Counting:       return Counting(grade, level, rng);
-                case MathSubject.Addition:       return Addition(grade, level, rng);
-                case MathSubject.Subtraction:    return Subtraction(grade, level, rng);
-                case MathSubject.Multiplication: return Multiplication(grade, level, rng);
-                case MathSubject.Division:       return Division(grade, level, rng);
-                case MathSubject.Shapes:         return Shapes(grade, level, rng);
-                case MathSubject.Patterns:       return Patterns(grade, level, rng);
-                case MathSubject.Fractions:      return Fractions(grade, level, rng);
-                case MathSubject.Measurement:    return Measurement(grade, level, rng);
-                case MathSubject.Time:           return Time(grade, level, rng);
-                case MathSubject.Money:          return Money(grade, level, rng);
-                default:                         return new List<MathQuestion>();
+                switch (subject)
+                {
+                    case MathSubject.Counting:       result = Counting(grade, level, rng);       break;
+                    case MathSubject.Addition:       result = Addition(grade, level, rng);       break;
+                    case MathSubject.Subtraction:    result = Subtraction(grade, level, rng);    break;
+                    case MathSubject.Multiplication: result = Multiplication(grade, level, rng); break;
+                    case MathSubject.Division:       result = Division(grade, level, rng);       break;
+                    case MathSubject.Shapes:         result = Shapes(grade, level, rng);         break;
+                    case MathSubject.Patterns:       result = Patterns(grade, level, rng);       break;
+                    case MathSubject.Fractions:      result = Fractions(grade, level, rng);      break;
+                    case MathSubject.Measurement:    result = Measurement(grade, level, rng);    break;
+                    case MathSubject.Time:           result = Time(grade, level, rng);           break;
+                    case MathSubject.Money:          result = Money(grade, level, rng);          break;
+                    default:                         result = new List<MathQuestion>();          break;
+                }
             }
+            catch (System.Exception ex)
+            {
+                Debug.LogError($"[QuestionGenerator] G{grade} {subject} L{level} threw: {ex.Message}\n{ex.StackTrace}");
+                result = null;
+            }
+
+            // Defensive: drop any malformed entries and replace empty/invalid
+            // levels with the universal fallback set. This catches both
+            // "generator threw" and "generator returned a question with
+            // correctIndex == -1" simultaneously.
+            if (result == null) result = new List<MathQuestion>();
+            for (int i = result.Count - 1; i >= 0; i--)
+            {
+                if (result[i] == null || !result[i].IsValid())
+                {
+                    Debug.LogWarning($"[QuestionGenerator] G{grade} {subject} L{level} produced invalid question at index {i}; dropping.");
+                    result.RemoveAt(i);
+                }
+            }
+            if (result.Count == 0)
+            {
+                Debug.LogWarning($"[QuestionGenerator] G{grade} {subject} L{level} produced 0 valid questions; using safe fallback set.");
+                result = FallbackQuestions(grade, level);
+            }
+            // Backfill the list with safe fallback questions if the generator
+            // only returned partial output. This keeps LearnMode (which slices
+            // questions[0..2] and questions[3..9]) and any other index-based
+            // consumer from running off the end of the list.
+            if (result.Count < QuestionsPerLevel)
+            {
+                Debug.LogWarning($"[QuestionGenerator] G{grade} {subject} L{level} produced only {result.Count} valid questions; padding to {QuestionsPerLevel}.");
+                var pad = FallbackQuestions(grade, level);
+                int i = 0;
+                while (result.Count < QuestionsPerLevel)
+                    result.Add(pad[i++ % pad.Count]);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Universal grade-appropriate fallback set. Used when a generator
+        /// branch throws or returns no valid questions. Keeps the gameplay
+        /// loop honest even on the most pathological RNG seeds.
+        /// </summary>
+        private static List<MathQuestion> FallbackQuestions(int grade, int level)
+        {
+            int range = grade == 1 ? 10 : grade == 2 ? 50 : 100;
+            var list = new List<MathQuestion>(QuestionsPerLevel);
+            var rng = new System.Random(HashSeed(grade, MathSubject.Addition, level) ^ 0x5AFE);
+            for (int i = 0; i < QuestionsPerLevel; i++)
+            {
+                int a = rng.Next(1, range);
+                int b = rng.Next(1, range);
+                int ans = a + b;
+                var q = new MathQuestion
+                {
+                    prompt      = $"{a} + {b} = ?",
+                    options     = SafeNonNegOptions(ans, Math.Max(2, ans / 4), rng),
+                    hint        = QuestionStrings.StartAtAndCountUp(Math.Max(a, b), Math.Min(a, b)),
+                    explanation = QuestionStrings.AddFormula(a, b, ans),
+                    difficulty  = ScaleDifficulty(level),
+                    visual      = QuestionVisual.TextOnly
+                };
+                q.correctIndex = IndexOf(q.options, ans.ToString());
+                if (q.correctIndex < 0) q.correctIndex = 0; // last-resort guard
+                list.Add(q);
+            }
+            return list;
         }
 
         public static MathSubject[] SubjectsFor(int grade)
@@ -688,13 +766,22 @@ namespace MathEdu.Utility
                 MathQuestion q;
                 if (grade == 2)
                 {
-                    int den = rng.Next(2, Math.Min(7, 3 + level / 4));
+                    // Grade 2 = "Which fraction means ONE of N equal parts?".
+                    // Pool the half / third / quarter / fifth / sixth labels and
+                    // always include the simplified answer plus 3 distractors
+                    // drawn from the same family.
+                    int den = rng.Next(2, Math.Min(7, 3 + level / 4 + 1));
+                    if (den < 2) den = 2;
                     int num = 1;
                     string label = $"{num}/{den}";
-                    string[] opts = { "1/2", "1/3", "1/4", "1/5", "1/6" };
-                    var pool = new List<string>(opts);
+                    string[] poolArr = { "1/2", "1/3", "1/4", "1/5", "1/6" };
+                    var pool = new List<string>(poolArr);
                     pool.Remove(label);
                     Shuffle(pool, rng);
+                    // Defensive: pool is guaranteed to have 4 items after the
+                    // remove, but if a future change adds duplicates we still
+                    // need exactly 3 distractors.
+                    while (pool.Count < 3) pool.Add($"1/{rng.Next(2, 10)}");
                     var picks = new[] { label, pool[0], pool[1], pool[2] };
                     Shuffle(picks, rng);
                     q = new MathQuestion
@@ -711,18 +798,75 @@ namespace MathEdu.Utility
                 }
                 else
                 {
-                    int den = rng.Next(2, Math.Min(10, 3 + level / 3));
+                    // Grade 3 = "Which fraction is equal to num/den?". Build
+                    // an equivalent (eqNum/eqDen) and three plausible
+                    // distractors.
+                    //
+                    // Previous bug: the original loop only drew "x/eqDen"
+                    // distractors, so for den=2 / factor=2 the eqDen was 4
+                    // and there were just 3 unique candidates available
+                    // (1/4, 2/4, 3/4). Subtract the correct answer and only
+                    // 2 distractors were possible — the while loop spun
+                    // forever on the main thread, producing the "black
+                    // screen on Fractions G3" symptom.
+                    //
+                    // Fix: prefer pedagogically interesting distractors
+                    // (different factors of num/den, inverted fractions),
+                    // bound the random search with a safety counter, and
+                    // pull from a varied-denominator fallback pool when
+                    // the same-denominator pool runs dry. The loop is
+                    // guaranteed to terminate.
+                    int denCap = Math.Max(3, Math.Min(10, 3 + level / 3 + 1));
+                    int den = rng.Next(2, denCap);
+                    if (den < 2) den = 2;
                     int num = rng.Next(1, den);
                     int factor = rng.Next(2, 5);
                     int eqNum = num * factor;
                     int eqDen = den * factor;
                     string answer = $"{eqNum}/{eqDen}";
+
                     var opts = new List<string> { answer };
-                    while (opts.Count < 4)
+
+                    // Tier 1 distractors: equivalents using *different*
+                    // multipliers (e.g. for 1/2 -> 2/4, also include 3/6
+                    // and 4/8 as distractors that look right at a glance).
+                    foreach (int alt in new[] { 2, 3, 4, 5 })
                     {
-                        string c = $"{rng.Next(1, eqDen)}/{eqDen}";
-                        if (!opts.Contains(c) && c != answer) opts.Add(c);
+                        if (alt == factor) continue;
+                        string cand = $"{num * alt}/{den * alt}";
+                        if (!opts.Contains(cand)) opts.Add(cand);
+                        if (opts.Count >= 4) break;
                     }
+
+                    // Tier 2 distractors: same-denominator but wrong
+                    // numerator (the original idea, but bounded and only
+                    // when there's room in the pool).
+                    int safety = 0;
+                    while (opts.Count < 4 && safety < 30 && eqDen > 2)
+                    {
+                        string cand = $"{rng.Next(1, eqDen)}/{eqDen}";
+                        if (!opts.Contains(cand)) opts.Add(cand);
+                        safety++;
+                    }
+
+                    // Tier 3 distractors: completely different fractions
+                    // pulled from a varied pool. Guaranteed to add a new
+                    // entry on each iteration because the search space is
+                    // far bigger than the 4 slots we need to fill.
+                    int fallbackDen = 7;
+                    int fallbackSafety = 0;
+                    while (opts.Count < 4 && fallbackSafety < 40)
+                    {
+                        string cand = $"{rng.Next(1, fallbackDen)}/{fallbackDen}";
+                        if (!opts.Contains(cand)) opts.Add(cand);
+                        fallbackDen++;
+                        fallbackSafety++;
+                    }
+                    // Absolute last resort — pad with synthetic distinct
+                    // strings so we always hand back a valid 4-option array.
+                    int pad = 100;
+                    while (opts.Count < 4) opts.Add($"1/{pad++}");
+
                     var arr = opts.ToArray();
                     Shuffle(arr, rng);
                     q = new MathQuestion
@@ -921,11 +1065,24 @@ namespace MathEdu.Utility
                     }
                     string answer = $"{hour:0}:{minute:00}";
                     var opts = new List<string> { answer };
-                    while (opts.Count < 4)
+                    // Bounded distractor search: grade 1 only has 12 unique
+                    // "h:00" values so the search space is tiny — without a
+                    // safety counter a pathological RNG seed could spin here.
+                    int safety = 0;
+                    while (opts.Count < 4 && safety < 60)
                     {
                         int h = rng.Next(1, 13);
                         int m = grade == 1 ? 0 : rng.Next(0, 60);
                         string c = $"{h:0}:{m:00}";
+                        if (!opts.Contains(c)) opts.Add(c);
+                        safety++;
+                    }
+                    // Deterministic fallback walk through every hour in case
+                    // the random search came up short (extremely unlikely but
+                    // keeps the generator total).
+                    for (int h = 1; h <= 12 && opts.Count < 4; h++)
+                    {
+                        string c = $"{h:0}:{(grade == 1 ? 0 : minute):00}";
                         if (!opts.Contains(c)) opts.Add(c);
                     }
                     var arr = opts.ToArray();
@@ -1051,7 +1208,8 @@ namespace MathEdu.Utility
         private static string[] SafeNonNegOptions(int answer, int spread, System.Random rng)
         {
             spread = Math.Max(1, spread);
-            var set = new HashSet<int> { Math.Max(0, answer) };
+            int safeAnswer = Math.Max(0, answer);
+            var set = new HashSet<int> { safeAnswer };
             int safety = 0;
             while (set.Count < 4 && safety < 50)
             {
@@ -1062,21 +1220,47 @@ namespace MathEdu.Utility
                 set.Add(candidate);
                 safety++;
             }
-            while (set.Count < 4) set.Add(answer + set.Count + 1);
+            // Deterministic padding: walk *upwards* from the highest value
+            // already in the set so we never collide with an existing entry
+            // (the previous implementation could collide and spin forever).
+            int next = (set.Count > 0 ? Max(set) : safeAnswer) + 1;
+            int padGuard = 0;
+            while (set.Count < 4 && padGuard < 100)
+            {
+                set.Add(next);
+                next++;
+                padGuard++;
+            }
             var arr = new List<int>(set).ToArray();
             Shuffle(arr, rng);
             var strs = new string[4];
-            for (int i = 0; i < 4; i++) strs[i] = arr[i].ToString();
+            // The set may still be < 4 in pathological cases (e.g. answer is
+            // gigantic and padGuard overflowed): backfill with synthetic
+            // distinct strings so callers always get a 4-slot array.
+            int n = Math.Min(4, arr.Length);
+            for (int i = 0; i < n; i++) strs[i] = arr[i].ToString();
+            for (int i = n; i < 4; i++) strs[i] = (safeAnswer + 1000 + i).ToString();
             return strs;
+        }
+
+        private static int Max(HashSet<int> set)
+        {
+            int m = int.MinValue;
+            foreach (var v in set) if (v > m) m = v;
+            return m;
         }
 
         /// <summary>
         /// Build 4 options for word problems: the correct answer plus three
         /// plausible distractors derived from common arithmetic mistakes.
+        ///
+        /// Defensive: the `seen` set is keyed off the *unclamped* answer so
+        /// the answer is never lost during dedup, and the padding loop is
+        /// bounded so a hostile distractor set can't spin the main thread.
         /// </summary>
         private static string[] WordOptions(int answer, int[] distractors, System.Random rng)
         {
-            var seen = new HashSet<int> { Math.Max(0, answer) };
+            var seen = new HashSet<int> { answer };
             var list = new List<int> { answer };
             foreach (var d in distractors)
             {
@@ -1085,12 +1269,27 @@ namespace MathEdu.Utility
                 if (v == answer) v = answer + 1;
                 if (seen.Add(v)) list.Add(v);
             }
-            int pad = 1;
+            // Pad with monotonically increasing values starting *above* the
+            // current max, so each iteration is guaranteed to add a new
+            // entry. Guarded with a safety counter as belt-and-braces.
+            int next = Math.Max(answer, 0);
+            foreach (var v in seen) if (v > next) next = v;
+            next++;
+            int padGuard = 0;
+            while (list.Count < 4 && padGuard < 100)
+            {
+                if (seen.Add(next)) list.Add(next);
+                next++;
+                padGuard++;
+            }
+            // Last-resort backfill with synthetic distinct values.
+            int synth = Math.Max(answer, 0) + 1000;
             while (list.Count < 4)
             {
-                int v = Math.Max(0, answer + pad);
-                if (seen.Add(v)) list.Add(v);
-                pad++;
+                while (seen.Contains(synth)) synth++;
+                seen.Add(synth);
+                list.Add(synth);
+                synth++;
             }
             var arr = list.ToArray();
             Shuffle(arr, rng);
@@ -1105,11 +1304,22 @@ namespace MathEdu.Utility
             return arr;
         }
 
+        /// <summary>
+        /// Find the index of <paramref name="value"/> in <paramref name="arr"/>.
+        /// Returns -1 if not found so the calling Generator can surface a
+        /// genuinely broken question via MathQuestion.IsValid() (which fails
+        /// on correctIndex &lt; 0) and let the wrapper in Generate() drop it.
+        /// The previous behaviour silently returned 0, which marked the
+        /// first option as correct even when the real answer was missing —
+        /// causing "right answer flagged wrong" bugs in the field.
+        /// </summary>
         private static int IndexOf<T>(T[] arr, T value)
         {
+            if (arr == null) return -1;
             for (int i = 0; i < arr.Length; i++)
                 if (Equals(arr[i], value)) return i;
-            return 0;
+            Debug.LogWarning($"[QuestionGenerator] Answer '{value}' not found in options [{string.Join(", ", arr)}]; question will be dropped.");
+            return -1;
         }
 
         private static void Shuffle<T>(IList<T> arr, System.Random rng)
