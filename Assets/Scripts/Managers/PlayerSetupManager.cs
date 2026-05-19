@@ -4,6 +4,9 @@
 // First-launch screen. Every visible string flows through Localization.T()
 // so the experience reads naturally in either English or Arabic the moment
 // the player lands here.
+//
+// Now supports grades 1-5. The grade strip uses a flexible HorizontalLayout
+// so five buttons still fit comfortably on phone widths.
 // -----------------------------------------------------------------------------
 
 using System.Collections.Generic;
@@ -30,7 +33,8 @@ namespace MathEdu.Managers
             _ = GameManager.Instance;
             _profile = GameManager.Instance.Profile;
             _selectedAvatarId = _profile.avatarId;
-            _selectedGrade    = Mathf.Clamp(_profile.selectedGrade, 1, 3);
+            _selectedGrade    = Mathf.Clamp(_profile.selectedGrade,
+                DatabaseBootstrapper.MinGrade, DatabaseBootstrapper.MaxGrade);
             Build();
         }
 
@@ -120,19 +124,22 @@ namespace MathEdu.Managers
             gradeRow.transform.SetParent(gradeBar, false);
             var grt = (RectTransform)gradeRow.transform;
             grt.anchorMin = new Vector2(0, 0); grt.anchorMax = new Vector2(1, 0.7f);
-            grt.offsetMin = new Vector2(24, 8); grt.offsetMax = new Vector2(-24, -8);
+            grt.offsetMin = new Vector2(12, 8); grt.offsetMax = new Vector2(-12, -8);
             var ghl = gradeRow.GetComponent<HorizontalLayoutGroup>();
-            ghl.spacing = 18; ghl.childForceExpandWidth = true;
+            // Tightened spacing/padding so all 5 buttons fit comfortably on
+            // phone widths down to ~720 px without overflowing.
+            ghl.spacing = 10; ghl.childForceExpandWidth = true;
+            ghl.childControlWidth = true;
             ghl.childAlignment = TextAnchor.MiddleCenter;
 
             _gradeButtons.Clear();
-            for (int g = 1; g <= 3; g++)
+            for (int g = DatabaseBootstrapper.MinGrade; g <= DatabaseBootstrapper.MaxGrade; g++)
             {
                 int captured = g;
                 var btn = UIFactory.CreateButton((RectTransform)gradeRow.transform,
                     Localization.T("setup.grade_n", g),
                     g == _selectedGrade ? UIFactory.Accent : UIFactory.Primary,
-                    40, $"GradeBtn_{g}");
+                    36, $"GradeBtn_{g}");
                 btn.onClick.AddListener(() => OnGradePicked(captured));
                 _gradeButtons.Add(btn);
             }
@@ -212,7 +219,8 @@ namespace MathEdu.Managers
                 var btn = _gradeButtons[i];
                 if (btn == null) continue;
                 var img = btn.GetComponent<Image>();
-                img.color = (i + 1 == _selectedGrade) ? UIFactory.Accent : UIFactory.Primary;
+                img.color = (i + DatabaseBootstrapper.MinGrade == _selectedGrade)
+                    ? UIFactory.Accent : UIFactory.Primary;
             }
         }
 
