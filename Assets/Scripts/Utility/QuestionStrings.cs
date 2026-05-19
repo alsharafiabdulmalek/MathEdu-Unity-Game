@@ -19,6 +19,19 @@
 // fields and they get refilled on the next access via
 // `DatabaseBootstrapper.EnsureLevelContent`. So every prompt the player sees
 // always reads in the currently-selected language - no restart required.
+//
+// === Grade 4 & 5 extensions (new section at the bottom of the file) =========
+// Adds prompts/hints/explanations for the advanced curriculum:
+//   * 5-6 digit addition & subtraction word problems.
+//   * 2x2-digit and 3x1-digit multiplication word problems.
+//   * Long division with remainders (G4) and 2-digit divisors (G5).
+//   * Triangle area, angle classification, parallelogram (G4 Shapes).
+//   * Cube/rectangular prism volume, composite shapes (G5 Shapes).
+//   * Fraction add/sub same denom (G4), unlike denom (G5), simplify, compare.
+//   * Number rules (find the rule 2n+1), position-to-term (G5 Patterns).
+//   * Compound unit conversions (G4/G5 Measurement) - mm, cm, m, km, ml, l.
+//   * 24-hour time, multi-step time word problems (G4/G5 Time).
+//   * Multi-item totals (G4 Money), percentage discounts (G5 Money).
 // -----------------------------------------------------------------------------
 
 using System;
@@ -496,35 +509,56 @@ namespace MathEdu.Utility
                 case MathSubject.Addition:
                     return grade == 1 ? ex + "2 + 3 = 5."
                          : grade == 2 ? ex + "24 + 13 = 37."
-                                      : ex + "245 + 138 = 383.";
+                         : grade == 3 ? ex + "245 + 138 = 383."
+                         : grade == 4 ? ex + "3 472 + 1 845 = 5 317."
+                                      : ex + "12 480 + 9 365 = 21 845.";
                 case MathSubject.Subtraction:
                     return grade == 1 ? ex + "5 - 2 = 3."
                          : grade == 2 ? ex + "47 - 12 = 35."
-                                      : ex + "642 - 215 = 427.";
+                         : grade == 3 ? ex + "642 - 215 = 427."
+                         : grade == 4 ? ex + "8 350 - 2 624 = 5 726."
+                                      : ex + "45 120 - 18 763 = 26 357.";
                 case MathSubject.Multiplication:
                     return grade == 2
                         ? (Ar ? "\u0645\u062b\u0627\u0644: 2 \u00d7 4 = 8 (\u0645\u062c\u0645\u0648\u0639\u062a\u0627\u0646 \u0645\u0646 \u0623\u0631\u0628\u0639\u0629)." : "Example: 2 x 4 = 8 (two groups of four).")
-                        : ex + "6 \u00d7 7 = 42.";
+                        : grade == 3 ? ex + "6 \u00d7 7 = 42."
+                        : grade == 4 ? ex + "23 \u00d7 14 = 322."
+                                      : ex + "146 \u00d7 27 = 3 942.";
                 case MathSubject.Division:
-                    return Ar ? "\u0645\u062b\u0627\u0644: 12 \u00f7 3 = 4 (\u0627\u062b\u0646\u0627 \u0639\u0634\u0631 \u062a\u064f\u0642\u0633\u064e\u0651\u0645 \u0625\u0644\u0649 3 \u0645\u062c\u0645\u0648\u0639\u0627\u062a)."
-                              : "Example: 12 / 3 = 4 (twelve shared into 3 groups).";
+                    return grade == 3
+                        ? (Ar ? "\u0645\u062b\u0627\u0644: 12 \u00f7 3 = 4 (\u0627\u062b\u0646\u0627 \u0639\u0634\u0631 \u062a\u064f\u0642\u0633\u064e\u0651\u0645 \u0625\u0644\u0649 3 \u0645\u062c\u0645\u0648\u0639\u0627\u062a)." : "Example: 12 / 3 = 4 (twelve shared into 3 groups).")
+                        : grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: 67 \u00f7 5 = 13 \u0648\u0627\u0644\u0628\u0627\u0642\u064a 2." : "Example: 67 / 5 = 13 remainder 2.")
+                                      : (Ar ? "\u0645\u062b\u0627\u0644: 384 \u00f7 16 = 24." : "Example: 384 / 16 = 24.");
                 case MathSubject.Shapes:
-                    return Ar ? "\u0645\u062b\u0627\u0644: \u0627\u0644\u0634\u0643\u0644 \u0630\u0648 \u0627\u0644\u062b\u0644\u0627\u062b\u0629 \u0623\u0636\u0644\u0627\u0639 \u0647\u0648 \u0627\u0644\u0645\u062b\u0644\u062b." : "Example: A shape with 3 sides is a triangle.";
+                    return grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: \u0645\u0633\u0627\u062d\u0629 \u0645\u062b\u0644\u0651\u062b = 1/2 \u00d7 \u0627\u0644\u0642\u0627\u0639\u062f\u0629 \u00d7 \u0627\u0644\u0627\u0631\u062a\u0641\u0627\u0639. \u0644\u0642\u0627\u0639\u062f\u0629 8 \u0648\u0627\u0631\u062a\u0641\u0627\u0639 6: \u0627\u0644\u0645\u0633\u0627\u062d\u0629 = 24."
+                                              : "Example: Triangle area = 1/2 \u00d7 base \u00d7 height. Base 8, height 6 -> area 24.")
+                        : grade == 5 ? (Ar ? "\u0645\u062b\u0627\u0644: \u062d\u062c\u0645 \u0635\u0646\u062f\u0648\u0642 4\u00d73\u00d72 = 24 \u0633\u0645\u00b3." : "Example: Volume of a 4\u00d73\u00d72 box = 24 cm\u00b3.")
+                        : (Ar ? "\u0645\u062b\u0627\u0644: \u0627\u0644\u0634\u0643\u0644 \u0630\u0648 \u0627\u0644\u062b\u0644\u0627\u062b\u0629 \u0623\u0636\u0644\u0627\u0639 \u0647\u0648 \u0627\u0644\u0645\u062b\u0644\u062b." : "Example: A shape with 3 sides is a triangle.");
                 case MathSubject.Patterns:
-                    return Ar ? "\u0645\u062b\u0627\u0644: \u0623\u060c \u0628\u060c \u0623\u060c \u0628\u060c \u0623\u060c ___. \u0627\u0644\u062a\u0627\u0644\u064a \u0647\u0648 \u0628." : "Example: A, B, A, B, A, ___. Next is B.";
+                    return grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: 2\u060c 5\u060c 8\u060c 11\u060c ___. \u0627\u0644\u0642\u0627\u0639\u062f\u0629: \u0627\u0636\u0641 3 \u0641\u064a \u0643\u0644 \u062e\u0637\u0648\u0629." : "Example: 2, 5, 8, 11, ___. Rule: add 3 each step.")
+                        : grade == 5 ? (Ar ? "\u0645\u062b\u0627\u0644: \u0627\u0644\u062d\u062f \u0627\u0644\u0646\u0648\u0646\u064a 2n+1 \u064a\u0639\u0637\u064a 3\u060c 5\u060c 7\u060c 9\u060c ..." : "Example: Term-rule 2n+1 gives 3, 5, 7, 9, ...")
+                        : (Ar ? "\u0645\u062b\u0627\u0644: \u0623\u060c \u0628\u060c \u0623\u060c \u0628\u060c \u0623\u060c ___. \u0627\u0644\u062a\u0627\u0644\u064a \u0647\u0648 \u0628." : "Example: A, B, A, B, A, ___. Next is B.");
                 case MathSubject.Fractions:
                     return grade == 2
                         ? (Ar ? "\u0645\u062b\u0627\u0644: 1/2 \u062a\u0639\u0646\u064a \u0648\u0627\u062d\u062f\u064b\u0627 \u0645\u0646 \u062c\u0632\u0623\u064a\u0646 \u0645\u062a\u0633\u0627\u0648\u064a\u064a\u0646." : "Example: 1/2 means one of two equal parts.")
-                        : (Ar ? "\u0645\u062b\u0627\u0644: 2/4 \u064a\u0633\u0627\u0648\u064a 1/2." : "Example: 2/4 is the same as 1/2.");
+                        : grade == 3 ? (Ar ? "\u0645\u062b\u0627\u0644: 2/4 \u064a\u0633\u0627\u0648\u064a 1/2." : "Example: 2/4 is the same as 1/2.")
+                        : grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: 1/5 + 2/5 = 3/5." : "Example: 1/5 + 2/5 = 3/5.")
+                                      : (Ar ? "\u0645\u062b\u0627\u0644: 1/2 + 1/3 = 5/6 (\u0648\u062d\u0651\u062f \u0627\u0644\u0645\u0642\u0627\u0645\u0627\u062a)." : "Example: 1/2 + 1/3 = 5/6 (find a common denominator).");
                 case MathSubject.Measurement:
-                    return Ar ? "\u0645\u062b\u0627\u0644: \u0642\u0644\u0645 \u0627\u0644\u0631\u0635\u0627\u0635 \u0623\u0642\u0635\u0631 \u0645\u0646 \u0627\u0644\u0637\u0627\u0648\u0644\u0629." : "Example: A pencil is shorter than a desk.";
+                    return grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: 2 \u0643\u063a + 350 \u063a = 2 350 \u063a." : "Example: 2 kg + 350 g = 2 350 g.")
+                        : grade == 5 ? (Ar ? "\u0645\u062b\u0627\u0644: \u0645\u0633\u0627\u062d\u0629 \u063a\u0631\u0641\u0629 4 \u0645 \u00d7 5 \u0645 = 20 \u0645\u00b2." : "Example: A room 4 m \u00d7 5 m has area 20 m\u00b2.")
+                        : (Ar ? "\u0645\u062b\u0627\u0644: \u0642\u0644\u0645 \u0627\u0644\u0631\u0635\u0627\u0635 \u0623\u0642\u0635\u0631 \u0645\u0646 \u0627\u0644\u0637\u0627\u0648\u0644\u0629." : "Example: A pencil is shorter than a desk.");
                 case MathSubject.Time:
                     return grade == 1
                         ? (Ar ? "\u0645\u062b\u0627\u0644: \u0639\u0646\u062f\u0645\u0627 \u064a\u0643\u0648\u0646 \u0627\u0644\u0639\u0642\u0631\u0628 \u0627\u0644\u0637\u0648\u064a\u0644 \u0639\u0644\u0649 12 \u0648\u0627\u0644\u0639\u0642\u0631\u0628 \u0627\u0644\u0642\u0635\u064a\u0631 \u0639\u0644\u0649 3\u060c \u062a\u0643\u0648\u0646 \u0627\u0644\u0633\u0627\u0639\u0629 3 \u062a\u0645\u0627\u0645\u064b\u0627."
-                              : "Example: When the long hand is on 12 and the short hand is on 3, it is 3 o'clock.")
+                                  : "Example: When the long hand is on 12 and the short hand is on 3, it is 3 o'clock.")
+                        : grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: 14:30 \u0628\u0646\u0638\u0627\u0645 24 \u0633\u0627\u0639\u0629 = 2:30 \u0645\u0633\u0627\u0621\u064b." : "Example: 14:30 (24-hour) = 2:30 pm.")
+                        : grade == 5 ? (Ar ? "\u0645\u062b\u0627\u0644: \u0645\u062f\u0651\u0629 \u0631\u062d\u0644\u0629 \u0645\u0646 9:45 \u0625\u0644\u0649 13:20 = 3 \u0633\u0627\u0639\u0627\u062a \u0648 35 \u062f\u0642\u064a\u0642\u0629." : "Example: 9:45 to 13:20 lasts 3 h 35 min.")
                         : (Ar ? "\u0645\u062b\u0627\u0644: 3:15 \u062a\u0639\u0646\u064a \u0627\u0644\u0633\u0627\u0639\u0629 3 \u0648\u062e\u0645\u0633 \u0639\u0634\u0631\u0629 \u062f\u0642\u064a\u0642\u0629." : "Example: 3:15 means 15 minutes past 3.");
                 case MathSubject.Money:
-                    return Ar ? "\u0645\u062b\u0627\u0644: \u0627\u0644\u0646\u064a\u0643\u0644 = 5 \u0641\u0644\u0648\u0633\u060c \u0627\u0644\u062f\u0627\u064a\u0645 = 10 \u0641\u0644\u0648\u0633." : "Example: A nickel = 5 cents, a dime = 10 cents.";
+                    return grade == 4 ? (Ar ? "\u0645\u062b\u0627\u0644: \u0633\u0639\u0631 3 \u062f\u0641\u0627\u062a\u0631 \u0628\u0640 240 \u0641\u0644\u0633\u064b\u0627 \u0644\u0644\u0648\u0627\u062d\u062f = 720 \u0641\u0644\u0633\u064b\u0627." : "Example: 3 notebooks at 240c each cost 720c.")
+                        : grade == 5 ? (Ar ? "\u0645\u062b\u0627\u0644: \u062e\u0635\u0645 20% \u0639\u0644\u0649 500 \u0641\u0644\u0633 = 100 \u0641\u0644\u0633 \u062e\u0635\u0645\u064b\u0627 \u0648400 \u0641\u0644\u0633 \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0646\u0647\u0627\u0626\u064a." : "Example: 20% off 500c = 100c off, final price 400c.")
+                        : (Ar ? "\u0645\u062b\u0627\u0644: \u0627\u0644\u0646\u064a\u0643\u0644 = 5 \u0641\u0644\u0648\u0633\u060c \u0627\u0644\u062f\u0627\u064a\u0645 = 10 \u0641\u0644\u0648\u0633." : "Example: A nickel = 5 cents, a dime = 10 cents.");
                 default: return string.Empty;
             }
         }
@@ -633,5 +667,243 @@ namespace MathEdu.Utility
                 _                          => "Great job! The story continues\u2026"
             };
         }
+
+        // =====================================================================
+        // GRADE 4 & 5 EXTENSIONS
+        // =====================================================================
+        // Advanced curriculum prompts. All bilingual. Numbers always rendered
+        // with Western-Arabic digits; Arabic prose uses Arabic punctuation
+        // (\u060c comma, \u061f question mark, etc.).
+        // ---------------------------------------------------------------------
+
+        // ----- Addition / Subtraction: large-number word problems -----
+        public static string CityPopulation(string name, int a, int b) =>
+            Ar ? $"\u064a\u0639\u064a\u0634 \u0641\u064a \u0645\u062f\u064a\u0646\u0629 {name} {a:N0} \u0634\u062e\u0635\u064b\u0627. \u062b\u0645 \u0627\u0646\u062a\u0642\u0644 \u0625\u0644\u064a\u0647\u0627 {b:N0} \u0623\u062e\u0631\u0648\u0646. \u0643\u0645 \u0639\u062f\u062f \u0633\u0643\u0651\u0627\u0646\u0647\u0627 \u0627\u0644\u0622\u0646\u061f"
+               : $"City {name} has {a:N0} people. {b:N0} more move in. What is the new population?";
+        public static string CityPopulationHint() =>
+            Ar ? "\u0627\u062c\u0645\u0639 \u0627\u0644\u0631\u0642\u0645\u064a\u0646 \u0639\u0645\u0648\u062f\u064a\u0651\u064b\u0627\u060c \u0628\u062f\u0621\u064b\u0627 \u0645\u0646 \u0623\u0642\u0635\u0649 \u0627\u0644\u064a\u0645\u064a\u0646."
+               : "Add the numbers column by column starting from the right.";
+
+        public static string FactoryBuiltSold(string product, int built, int sold) =>
+            Ar ? $"\u0635\u0646\u0651\u0639\u062a \u0648\u0631\u0634\u0629 {built:N0} {product}\u060c \u0648\u0628\u0627\u0639\u062a {sold:N0}. \u0643\u0645 \u062a\u0628\u0642\u0651\u0649 \u0641\u064a \u0627\u0644\u0645\u062e\u0632\u0646\u061f"
+               : $"A factory built {built:N0} {product} and sold {sold:N0}. How many remain in stock?";
+        public static string FactoryHint(int built, int sold) =>
+            Ar ? $"\u0627\u0637\u0631\u062d \u0627\u0644\u0645\u0628\u064a\u0639 \u0645\u0646 \u0627\u0644\u0645\u0635\u0646\u0648\u0639: {built:N0} - {sold:N0}."
+               : $"Subtract sold from built: {built:N0} - {sold:N0}.";
+
+        public static string ProductWidgetName(int idx)
+        {
+            string[] en = { "toys", "books", "phones", "shirts", "shoes", "watches" };
+            string[] ar = { "\u0623\u0644\u0639\u0627\u0628", "\u0643\u062a\u0628", "\u0647\u0648\u0627\u062a\u0641", "\u0642\u0645\u0635\u0627\u0646", "\u0623\u062d\u0630\u064a\u0629", "\u0633\u0627\u0639\u0627\u062a" };
+            idx = Math.Abs(idx) % en.Length;
+            return Ar ? ar[idx] : en[idx];
+        }
+
+        // ----- Multiplication: 2x2 + 3x1 word problems -----
+        public static string SchoolStudentsBuses(int buses, int per) =>
+            Ar ? $"\u062a\u0646\u0642\u0644 \u0645\u062f\u0631\u0633\u0629 \u0637\u0644\u0627\u0628\u0647\u0627 \u0641\u064a {buses} \u062d\u0627\u0641\u0644\u0629\u060c \u0641\u064a \u0643\u0644 \u062d\u0627\u0641\u0644\u0629 {per} \u0637\u0627\u0644\u0628\u064b\u0627. \u0643\u0645 \u0637\u0627\u0644\u0628\u064b\u0627 \u0641\u064a \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u061f"
+               : $"A school transports its students in {buses} buses with {per} students each. How many students in total?";
+        public static string BoxOfPacks(int packs, int per, string item) =>
+            Ar ? $"\u062a\u062d\u062a\u0648\u064a \u0639\u0644\u0628\u0629 \u0639\u0644\u0649 {packs} \u062d\u0632\u0645\u0629\u060c \u0641\u064a \u0643\u0644 \u062d\u0632\u0645\u0629 {per} {item}. \u0643\u0645 \u0627\u0644\u0639\u062f\u062f \u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a\u061f"
+               : $"A carton has {packs} packs with {per} {item} each. How many {item} in total?";
+
+        // ----- Division: with remainders + 2-digit divisors -----
+        public static string DivideWithRemainderPrompt(int a, int b) =>
+            Ar ? $"{a} \u00f7 {b} = \u061f (\u0627\u0643\u062a\u0628 \u0627\u0644\u0646\u0627\u062a\u062c \u062b\u0645 \u0627\u0644\u0628\u0627\u0642\u064a)"
+               : $"{a} \u00f7 {b} = ? (give quotient then remainder)";
+        public static string RemainderHint(int b) =>
+            Ar ? $"\u0627\u0648\u062c\u062f \u0623\u0643\u0628\u0631 \u0639\u062f\u062f \u0645\u0646 \u0645\u0636\u0627\u0639\u0641\u0627\u062a {b} \u0623\u0635\u063a\u0631 \u0623\u0648 \u064a\u0633\u0627\u0648\u064a \u0627\u0644\u0645\u0642\u0633\u0648\u0645."
+               : $"Find the largest multiple of {b} less than or equal to the dividend.";
+        public static string QuotientRemainderExplain(int a, int b, int q, int r) =>
+            $"{a} = {b} \u00d7 {q} + {r}.";
+
+        public static string SharePeopleRemainder(string name, int total, int people) =>
+            Ar ? $"\u064a\u0648\u0632\u0651\u0639 {name} {total} \u0628\u0637\u0627\u0642\u0629 \u0639\u0644\u0649 {people} \u0623\u0635\u062f\u0642\u0627\u0621 \u0628\u0627\u0644\u062a\u0633\u0627\u0648\u064a. \u0643\u0645 \u0628\u0637\u0627\u0642\u0629 \u0633\u062a\u062a\u0628\u0642\u0651\u0649 \u0645\u0639\u0647\u061f"
+               : $"{name} shares {total} cards equally between {people} friends. How many cards are left over?";
+
+        public static string LongDivision2Digit(int total, int divisor) =>
+            Ar ? $"\u0627\u0648\u062c\u062f \u0646\u0627\u062a\u062c {total} \u00f7 {divisor}."
+               : $"Solve {total} \u00f7 {divisor}.";
+        public static string LongDivisionHint() =>
+            Ar ? "\u0627\u0639\u0645\u0644 \u0628\u0627\u0644\u0642\u0633\u0645\u0629 \u0627\u0644\u0645\u0637\u0648\u0651\u0644\u0629: \u062e\u0630 \u062e\u0627\u0646\u0629 \u062e\u0627\u0646\u0629 \u0645\u0646 \u0627\u0644\u064a\u0633\u0627\u0631."
+               : "Use long division: take one digit at a time from the left.";
+
+        // ----- Shapes (G4): triangle area, angles, parallelogram -----
+        public static string TriangleAreaPrompt(int b, int h) =>
+            Ar ? $"\u0645\u062b\u0644\u0651\u062b \u0642\u0627\u0639\u062f\u062a\u0647 {b} \u0633\u0645 \u0648\u0627\u0631\u062a\u0641\u0627\u0639\u0647 {h} \u0633\u0645. \u0645\u0627 \u0645\u0633\u0627\u062d\u062a\u0647\u061f"
+               : $"A triangle has base {b} cm and height {h} cm. What is its area?";
+        public static string TriangleAreaFormula() =>
+            Ar ? "\u0645\u0633\u0627\u062d\u0629 \u0627\u0644\u0645\u062b\u0644\u062b = \u00bd \u00d7 \u0627\u0644\u0642\u0627\u0639\u062f\u0629 \u00d7 \u0627\u0644\u0627\u0631\u062a\u0641\u0627\u0639."
+               : "Triangle area = \u00bd \u00d7 base \u00d7 height.";
+        public static string TriangleAreaExplain(int b, int h, int ans) =>
+            Ar ? $"\u00bd \u00d7 {b} \u00d7 {h} = {ans} \u0633\u0645\u00b2."
+               : $"\u00bd \u00d7 {b} \u00d7 {h} = {ans} cm\u00b2.";
+
+        public static string ClassifyAnglePrompt(int deg) =>
+            Ar ? $"\u0635\u0646\u0651\u0641 \u0627\u0644\u0632\u0627\u0648\u064a\u0629 \u0627\u0644\u062a\u064a \u0642\u064a\u0627\u0633\u0647\u0627 {deg}\u00b0."
+               : $"Classify the angle that measures {deg}\u00b0.";
+        public static string[] AngleOptions() =>
+            Ar ? new[] { "\u062d\u0627\u062f\u0629", "\u0642\u0627\u0626\u0645\u0629", "\u0645\u0646\u0641\u0631\u062c\u0629", "\u0645\u0633\u062a\u0642\u064a\u0645\u0629" }
+               : new[] { "Acute", "Right", "Obtuse", "Straight" };
+        public static string AngleClassify(int deg)
+        {
+            if (deg < 90) return Ar ? "\u062d\u0627\u062f\u0629" : "Acute";
+            if (deg == 90) return Ar ? "\u0642\u0627\u0626\u0645\u0629" : "Right";
+            if (deg < 180) return Ar ? "\u0645\u0646\u0641\u0631\u062c\u0629" : "Obtuse";
+            return Ar ? "\u0645\u0633\u062a\u0642\u064a\u0645\u0629" : "Straight";
+        }
+        public static string AngleHint() =>
+            Ar ? "\u0627\u0644\u0632\u0627\u0648\u064a\u0629 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 = 90\u00b0\u060c \u0648\u0627\u0644\u0645\u0633\u062a\u0642\u064a\u0645\u0629 = 180\u00b0."
+               : "Right angle = 90\u00b0, straight angle = 180\u00b0.";
+
+        // ----- Shapes (G5): volume + composite -----
+        public static string CubeVolumePrompt(int s) =>
+            Ar ? $"\u0645\u0643\u0639\u0651\u0628 \u0637\u0648\u0644 \u062d\u0631\u0641\u0647 {s} \u0633\u0645. \u0645\u0627 \u062d\u062c\u0645\u0647\u061f"
+               : $"A cube has edge {s} cm. What is its volume?";
+        public static string CubeVolumeFormula() =>
+            Ar ? "\u062d\u062c\u0645 \u0627\u0644\u0645\u0643\u0639\u0651\u0628 = \u0627\u0644\u0636\u0644\u0639 \u00d7 \u0627\u0644\u0636\u0644\u0639 \u00d7 \u0627\u0644\u0636\u0644\u0639." : "Cube volume = edge \u00d7 edge \u00d7 edge.";
+        public static string CubeVolumeExplain(int s, int v) =>
+            Ar ? $"{s}\u00d7{s}\u00d7{s} = {v} \u0633\u0645\u00b3." : $"{s}\u00d7{s}\u00d7{s} = {v} cm\u00b3.";
+
+        public static string PrismVolumePrompt(int l, int w, int h) =>
+            Ar ? $"\u0645\u062a\u0648\u0627\u0632\u064a \u0645\u0633\u062a\u0637\u064a\u0644\u0627\u062a \u0623\u0628\u0639\u0627\u062f\u0647 {l}\u00d7{w}\u00d7{h} \u0633\u0645. \u0645\u0627 \u062d\u062c\u0645\u0647\u061f"
+               : $"A rectangular prism is {l}\u00d7{w}\u00d7{h} cm. What is its volume?";
+        public static string PrismVolumeFormula() =>
+            Ar ? "\u0627\u0644\u062d\u062c\u0645 = \u0627\u0644\u0637\u0648\u0644 \u00d7 \u0627\u0644\u0639\u0631\u0636 \u00d7 \u0627\u0644\u0627\u0631\u062a\u0641\u0627\u0639." : "Volume = length \u00d7 width \u00d7 height.";
+        public static string PrismVolumeExplain(int l, int w, int h, int v) =>
+            Ar ? $"{l}\u00d7{w}\u00d7{h} = {v} \u0633\u0645\u00b3." : $"{l}\u00d7{w}\u00d7{h} = {v} cm\u00b3.";
+
+        // ----- Patterns (G4/G5): find-the-rule + position-to-term -----
+        public static string FindRulePrompt(int s0, int s1, int s2, int s3) =>
+            Ar ? $"\u0627\u0648\u062c\u062f \u0627\u0644\u0642\u0627\u0639\u062f\u0629\u060c \u062b\u0645 \u062f\u064f\u0644\u0651 \u0639\u0644\u0649 \u0627\u0644\u062d\u062f \u0627\u0644\u062a\u0627\u0644\u064a:\n{s0}\u060c {s1}\u060c {s2}\u060c {s3}\u060c \u061f"
+               : $"Find the rule, then give the next term:\n{s0}, {s1}, {s2}, {s3}, ?";
+        public static string FindRuleAddHint(int step) =>
+            Ar ? $"\u0627\u0644\u0641\u0631\u0642 \u062b\u0627\u0628\u062a: +{step}." : $"Constant difference: +{step}.";
+        public static string FindRuleMulHint(int ratio) =>
+            Ar ? $"\u0627\u0644\u0646\u0633\u0628\u0629 \u062b\u0627\u0628\u062a\u0629: \u00d7{ratio}." : $"Constant ratio: \u00d7{ratio}.";
+
+        public static string TermRulePrompt(string ruleEn, string ruleAr, int n) =>
+            Ar ? $"\u0627\u062d\u0633\u0628 \u0627\u0644\u062d\u062f\u0651 \u0631\u0642\u0645 {n} \u0644\u0644\u0642\u0627\u0639\u062f\u0629: {ruleAr}."
+               : $"Compute term number {n} for the rule: {ruleEn}.";
+        public static string TermRuleHint() =>
+            Ar ? "\u0639\u0648\u0651\u0636 \u0639\u0646 n \u0628\u0631\u0642\u0645 \u0627\u0644\u062d\u062f\u0651." : "Substitute n with the term position.";
+        public static string TermRuleExplain(string ruleEn, string ruleAr, int n, int ans) =>
+            Ar ? $"{ruleAr} \u0639\u0646\u062f n={n}: \u0627\u0644\u0646\u0627\u062a\u062c {ans}." : $"{ruleEn} at n={n} gives {ans}.";
+
+        // ----- Fractions (G4): add/sub same denom + compare + simplify -----
+        public static string FracAddPrompt(int n1, int n2, int den) =>
+            Ar ? $"\u0623\u0648\u062c\u062f: {n1}/{den} + {n2}/{den}." : $"Compute: {n1}/{den} + {n2}/{den}.";
+        public static string FracSubPrompt(int n1, int n2, int den) =>
+            Ar ? $"\u0623\u0648\u062c\u062f: {n1}/{den} - {n2}/{den}." : $"Compute: {n1}/{den} - {n2}/{den}.";
+        public static string FracSameDenHint() =>
+            Ar ? "\u0639\u0646\u062f \u062a\u0633\u0627\u0648\u064a \u0627\u0644\u0645\u0642\u0627\u0645\u060c \u0627\u062c\u0645\u0639 \u0623\u0648 \u0627\u0637\u0631\u062d \u0627\u0644\u0628\u0633\u0648\u0637 \u0641\u0642\u0637."
+               : "With equal denominators, add or subtract the numerators only.";
+        public static string FracSimplifyPrompt(int n, int d) =>
+            Ar ? $"\u0628\u0633\u0651\u0637: {n}/{d}." : $"Simplify: {n}/{d}.";
+        public static string FracSimplifyHint() =>
+            Ar ? "\u0627\u0642\u0633\u0645 \u0627\u0644\u0628\u0633\u0637 \u0648\u0627\u0644\u0645\u0642\u0627\u0645 \u0639\u0644\u0649 \u0627\u0644\u0639\u0627\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u0623\u0643\u0628\u0631."
+               : "Divide top and bottom by the greatest common factor.";
+        public static string FracCompare(int n1, int d1, int n2, int d2) =>
+            Ar ? $"\u0623\u064a\u0651\u0647\u0645\u0627 \u0623\u0643\u0628\u0631: {n1}/{d1} \u0623\u0645 {n2}/{d2}\u061f"
+               : $"Which is greater: {n1}/{d1} or {n2}/{d2}?";
+        public static string FracCompareHint() =>
+            Ar ? "\u0648\u062d\u0651\u062f \u0627\u0644\u0645\u0642\u0627\u0645\u0627\u062a \u0623\u0648\u0644\u0627\u064b." : "Make the denominators equal first.";
+
+        // ----- Fractions (G5): unlike denominators -----
+        public static string FracAddUnlike(int n1, int d1, int n2, int d2) =>
+            Ar ? $"\u0623\u0648\u062c\u062f: {n1}/{d1} + {n2}/{d2}." : $"Compute: {n1}/{d1} + {n2}/{d2}.";
+        public static string FracSubUnlike(int n1, int d1, int n2, int d2) =>
+            Ar ? $"\u0623\u0648\u062c\u062f: {n1}/{d1} - {n2}/{d2}." : $"Compute: {n1}/{d1} - {n2}/{d2}.";
+        public static string FracUnlikeHint(int lcm) =>
+            Ar ? $"\u0648\u062d\u0651\u062f \u0627\u0644\u0645\u0642\u0627\u0645\u0627\u062a \u0625\u0644\u0649 {lcm} \u0623\u0648\u0644\u0627\u064b."
+               : $"Convert both fractions to have denominator {lcm} first.";
+
+        // ----- Measurement (G4/G5): compound + area/volume -----
+        public static string CompoundLength(int km, int m) =>
+            Ar ? $"\u0643\u0645 \u0645\u062a\u0631\u064b\u0627 \u0641\u064a {km} \u0643\u0645 + {m} \u0645\u061f"
+               : $"How many metres in {km} km + {m} m?";
+        public static string CompoundLengthHint() =>
+            Ar ? "1 \u0643\u0645 = 1000 \u0645. \u0627\u0636\u0631\u0628 \u062b\u0645 \u0627\u062c\u0645\u0639."
+               : "1 km = 1000 m. Multiply then add.";
+
+        public static string CompoundMass(int kg, int g) =>
+            Ar ? $"\u0643\u0645 \u063a\u0631\u0627\u0645\u064b\u0627 \u0641\u064a {kg} \u0643\u063a + {g} \u063a\u061f"
+               : $"How many grams in {kg} kg + {g} g?";
+        public static string CompoundMassHint() =>
+            Ar ? "1 \u0643\u063a = 1000 \u063a." : "1 kg = 1000 g.";
+
+        public static string CompoundVolume(int l, int ml) =>
+            Ar ? $"\u0643\u0645 \u0645\u0644\u0644\u064a\u0644\u062a\u0631\u064b\u0627 \u0641\u064a {l} \u0644 + {ml} \u0645\u0644\u061f"
+               : $"How many millilitres in {l} l + {ml} ml?";
+        public static string CompoundVolumeHint() =>
+            Ar ? "1 \u0644 = 1000 \u0645\u0644." : "1 l = 1000 ml.";
+
+        public static string AreaInMetres(int w, int h) =>
+            Ar ? $"\u063a\u0631\u0641\u0629 \u0623\u0628\u0639\u0627\u062f\u0647\u0627 {w} \u0645 \u0641\u064a {h} \u0645. \u0645\u0627 \u0645\u0633\u0627\u062d\u062a\u0647\u0627 \u0628\u0627\u0644\u0645\u062a\u0631 \u0627\u0644\u0645\u0631\u0628\u0651\u0639\u061f"
+               : $"A room is {w} m by {h} m. What is its area in m\u00b2?";
+        public static string AreaInMetresExplain(int w, int h, int ans) =>
+            Ar ? $"{w} \u00d7 {h} = {ans} \u0645\u00b2." : $"{w} \u00d7 {h} = {ans} m\u00b2.";
+
+        // ----- Time (G4): 24-hour conversion + add durations -----
+        public static string Convert24To12(int h24, int m) =>
+            Ar ? $"\u0645\u0627 \u0645\u0627 \u064a\u0642\u0627\u0628\u0644 {h24:00}:{m:00} \u0628\u0646\u0638\u0627\u0645 12 \u0633\u0627\u0639\u0629\u061f"
+               : $"What is {h24:00}:{m:00} in 12-hour time?";
+        public static string TwentyFourHourHint() =>
+            Ar ? "\u0625\u0630\u0627 \u0643\u0627\u0646\u062a \u0627\u0644\u0633\u0627\u0639\u0629 > 12\u060c \u0627\u0637\u0631\u062d 12 \u0648\u0623\u0636\u0641 'm'."
+               : "If the hour > 12, subtract 12 and add ' pm'.";
+        public static string Format12HourClock(int h24, int m)
+        {
+            string suffix = h24 >= 12 ? (Ar ? "\u0645\u0633\u0627\u0621\u064b" : "pm") : (Ar ? "\u0635\u0628\u0627\u062d\u064b\u0627" : "am");
+            int h12 = h24 % 12; if (h12 == 0) h12 = 12;
+            return Ar ? $"{h12}:{m:00} {suffix}" : $"{h12}:{m:00} {suffix}";
+        }
+
+        public static string AddDuration(int h1, int m1, int addMin) =>
+            Ar ? $"\u0628\u062f\u0623\u062a \u0627\u0644\u0645\u0628\u0627\u0631\u0627\u0629 \u0641\u064a {h1}:{m1:00} \u0648\u0627\u0633\u062a\u0645\u0631\u0651\u062a {addMin} \u062f\u0642\u064a\u0642\u0629. \u0645\u062a\u0649 \u0627\u0646\u062a\u0647\u062a\u061f"
+               : $"A match starts at {h1}:{m1:00} and lasts {addMin} minutes. What time does it end?";
+        public static string AddDurationHint() =>
+            Ar ? "\u0623\u0636\u0641 \u0627\u0644\u062f\u0642\u0627\u0626\u0642\u060c \u062b\u0645 \u062d\u0648\u0651\u0644 \u0643\u0644 60 \u062f\u0642\u064a\u0642\u0629 \u0625\u0644\u0649 \u0633\u0627\u0639\u0629 \u062c\u062f\u064a\u062f\u0629."
+               : "Add minutes, then convert every 60 minutes into an extra hour.";
+
+        // ----- Time (G5): across days, multi-leg journey -----
+        public static string MultiLegTrip(int leg1, int leg2) =>
+            Ar ? $"\u0627\u0633\u062a\u063a\u0631\u0642\u062a \u0631\u062d\u0644\u0629 \u0623\u0648\u0644\u0649 {leg1} \u062f\u0642\u064a\u0642\u0629 \u0648\u062b\u0627\u0646\u064a\u0629 {leg2} \u062f\u0642\u064a\u0642\u0629. \u0645\u0627 \u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0648\u0642\u062a \u0628\u0627\u0644\u062f\u0642\u0627\u0626\u0642\u061f"
+               : $"Trip A takes {leg1} min, trip B takes {leg2} min. Total minutes?";
+        public static string MultiLegHint(int leg1, int leg2) =>
+            Ar ? $"\u0627\u062c\u0645\u0639: {leg1} + {leg2}." : $"Add: {leg1} + {leg2}.";
+
+        // ----- Money (G4): multi-item totals -----
+        public static string BillManyItems(int qty, int unitPrice, string item) =>
+            Ar ? $"\u0633\u0639\u0631 \u0627\u0644\u0648\u0627\u062d\u062f {unitPrice}\u0641 \u0648\u062a\u0631\u064a\u062f \u0634\u0631\u0627\u0621 {qty} \u0645\u0646 {item}. \u0645\u0627 \u0627\u0644\u062a\u0643\u0644\u0641\u0629 \u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a\u0629\u061f"
+               : $"{item} cost {unitPrice}c each. What is the total cost for {qty}?";
+        public static string BillManyItemsHint(int qty, int up) =>
+            Ar ? $"\u0627\u0636\u0631\u0628: {qty} \u00d7 {up}." : $"Multiply: {qty} \u00d7 {up}.";
+
+        public static string TwoLineBill(int q1, int p1, string i1, int q2, int p2, string i2) =>
+            Ar ? $"\u0627\u0634\u062a\u0631\u064a\u062a {q1} {i1} \u0628\u0640{p1}\u0641 \u0644\u0644\u0648\u0627\u062d\u062f \u0648{q2} {i2} \u0628\u0640{p2}\u0641 \u0644\u0644\u0648\u0627\u062d\u062f. \u0645\u0627 \u0627\u0644\u0645\u062c\u0645\u0648\u0639\u061f"
+               : $"You buy {q1} {i1} at {p1}c each and {q2} {i2} at {p2}c each. Total?";
+        public static string TwoLineBillHint(int q1, int p1, int q2, int p2) =>
+            Ar ? $"\u0627\u0644\u062e\u0637\u0648\u0629 1: {q1}\u00d7{p1}.\n\u0627\u0644\u062e\u0637\u0648\u0629 2: {q2}\u00d7{p2}.\n\u0627\u0644\u062e\u0637\u0648\u0629 3: \u0627\u0644\u0645\u062c\u0645\u0648\u0639."
+               : $"Step 1: {q1}\u00d7{p1}.\nStep 2: {q2}\u00d7{p2}.\nStep 3: add the two.";
+
+        // ----- Money (G5): percentages + discounts -----
+        public static string PercentOf(int pct, int amount) =>
+            Ar ? $"\u0643\u0645 \u064a\u0628\u0644\u063a {pct}% \u0645\u0646 {amount}\u0641\u061f"
+               : $"What is {pct}% of {amount}c?";
+        public static string PercentHint() =>
+            Ar ? "\u0627\u0636\u0631\u0628 \u0627\u0644\u0645\u0628\u0644\u063a \u0641\u064a \u0627\u0644\u0646\u0633\u0628\u0629 \u0648\u0627\u0642\u0633\u0645 \u0639\u0644\u0649 100."
+               : "Multiply the amount by the percent, then divide by 100.";
+        public static string PercentExplain(int pct, int amount, int ans) =>
+            Ar ? $"{amount} \u00d7 {pct} \u00f7 100 = {ans}\u0641." : $"{amount} \u00d7 {pct} \u00f7 100 = {ans}c.";
+
+        public static string DiscountPrompt(int price, int pctOff) =>
+            Ar ? $"\u0633\u0639\u0631 \u0623\u0635\u0644\u064a {price}\u0641 \u0648\u062e\u0635\u0645 {pctOff}%. \u0645\u0627 \u0627\u0644\u0633\u0639\u0631 \u0628\u0639\u062f \u0627\u0644\u062e\u0635\u0645\u061f"
+               : $"Original price {price}c, discount {pctOff}%. Final price?";
+        public static string DiscountHint(int pctOff) =>
+            Ar ? $"\u0627\u062d\u0633\u0628 {pctOff}% \u0645\u0646 \u0627\u0644\u0633\u0639\u0631 \u062b\u0645 \u0627\u0637\u0631\u062d\u0647 \u0645\u0646 \u0627\u0644\u0633\u0639\u0631 \u0627\u0644\u0623\u0635\u0644\u064a."
+               : $"Find {pctOff}% of the price then subtract it from the original price.";
+        public static string DiscountExplain(int price, int pctOff, int off, int final) =>
+            Ar ? $"{price} - {off} = {final}\u0641 ({pctOff}% \u062e\u0635\u0645)."
+               : $"{price} - {off} = {final}c ({pctOff}% off).";
     }
 }
