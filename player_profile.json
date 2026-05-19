@@ -1,0 +1,317 @@
+{
+    "playerName": "Player",
+    "avatarId": "default",
+    "selectedGrade": 1,
+    "setupComplete": false,
+    "xp": 0,
+    "totalStars": 0,
+    "badges": [],
+    "levelProgress": [
+        {
+            "levelId": "g1_counting_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_addition_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_subtraction_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_shapes_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_patterns_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_measurement_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_time_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g1_money_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_counting_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_addition_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_subtraction_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_multiplication_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_shapes_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_fractions_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_measurement_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_time_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g2_money_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_addition_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_subtraction_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_multiplication_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_division_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_shapes_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_fractions_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_measurement_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_time_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        },
+        {
+            "levelId": "g3_money_l1",
+            "stars": 0,
+            "bestScore": 0,
+            "timesPlayed": 0,
+            "unlocked": true
+        }
+    ],
+    "subjectStats": [
+        {
+            "subjectKey": "counting",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "addition",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "subtraction",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "shapes",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "patterns",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "measurement",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "time",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "money",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "multiplication",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "fractions",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        },
+        {
+            "subjectKey": "division",
+            "questionsAnswered": 0,
+            "questionsCorrect": 0,
+            "levelsCompleted": 0,
+            "starsEarned": 0,
+            "timeSpentSeconds": 0.0,
+            "lastPlayedIsoUtc": "",
+            "highestLevelUnlocked": 1
+        }
+    ],
+    "totalPlaySeconds": 0.0,
+    "speedRoundBestStreak": 0,
+    "playDays": [],
+    "lastPlayDate": "",
+    "consecutiveDayStreak": 0,
+    "musicOn": true,
+    "sfxOn": true,
+    "musicVolume": 0.699999988079071,
+    "sfxVolume": 1.0,
+    "hapticsOn": true,
+    "language": "en",
+    "parentalPin": "0000"
+}
