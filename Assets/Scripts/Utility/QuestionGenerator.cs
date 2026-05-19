@@ -45,7 +45,7 @@ namespace MathEdu.Utility
         ///
         /// SAFETY NET: every generator branch is wrapped in try/catch. If any
         /// per-subject method throws (out-of-range RNG, division by zero,
-        /// runaway distractor loops, …) we log a clear warning and fall back
+        /// runaway distractor loops, ...) we log a clear warning and fall back
         /// to a small set of trivially valid math questions so the gameplay
         /// scene NEVER opens to a black screen.
         /// </summary>
@@ -799,23 +799,23 @@ namespace MathEdu.Utility
                 else
                 {
                     // Grade 3 = "Which fraction is equal to num/den?". Build
-                    // an equivalent (eqNum/eqDen) and three plausible
-                    // distractors.
+                    // an equivalent (eqNum/eqDen) as the correct answer and
+                    // three NON-equivalent but plausible distractors.
                     //
-                    // Previous bug: the original loop only drew "x/eqDen"
-                    // distractors, so for den=2 / factor=2 the eqDen was 4
-                    // and there were just 3 unique candidates available
-                    // (1/4, 2/4, 3/4). Subtract the correct answer and only
-                    // 2 distractors were possible — the while loop spun
-                    // forever on the main thread, producing the "black
-                    // screen on Fractions G3" symptom.
-                    //
-                    // Fix: prefer pedagogically interesting distractors
-                    // (different factors of num/den, inverted fractions),
-                    // bound the random search with a safety counter, and
-                    // pull from a varied-denominator fallback pool when
-                    // the same-denominator pool runs dry. The loop is
-                    // guaranteed to terminate.
+                    // History:
+                    //   v1: looped picking x/eqDen -> infinite loop when eqDen
+                    //       was too small to produce 4 unique options.
+                    //   v2: used num*alt/den*alt distractors -- but those are
+                    //       MATHEMATICALLY EQUIVALENT to the answer (1/2 ==
+                    //       2/4 == 3/6 == 4/8). Players who picked any of
+                    //       them got marked wrong even though they were
+                    //       actually right.
+                    //   v3 (current): every distractor is checked with
+                    //       IsEquivalent() before being added, so no
+                    //       multiple-correct trap survives. Distractors are
+                    //       chosen from common student mistakes (off-by-one
+                    //       in num or den, unscaled num + scaled den, etc.)
+                    //       so they still feel plausible.
                     int denCap = Math.Max(3, Math.Min(10, 3 + level / 3 + 1));
                     int den = rng.Next(2, denCap);
                     if (den < 2) den = 2;
@@ -827,45 +827,56 @@ namespace MathEdu.Utility
 
                     var opts = new List<string> { answer };
 
-                    // Tier 1 distractors: equivalents using *different*
-                    // multipliers (e.g. for 1/2 -> 2/4, also include 3/6
-                    // and 4/8 as distractors that look right at a glance).
-                    foreach (int alt in new[] { 2, 3, 4, 5 })
+                    // Plausible-but-WRONG candidates. Each is rejected if it
+                    // happens to equal the answer (num/den).
+                    bool IsEq(int n2, int d2) =>
+                        d2 != 0 && num * d2 == n2 * den;
+
+                    var attempts = new List<(int n, int d)>
                     {
-                        if (alt == factor) continue;
-                        string cand = $"{num * alt}/{den * alt}";
-                        if (!opts.Contains(cand)) opts.Add(cand);
+                        (eqNum + 1, eqDen),                          // num off by +1   (e.g. 3/4 for 2/4)
+                        (Math.Max(1, eqNum - 1), eqDen),             // num off by -1   (e.g. 1/4 for 2/4)
+                        (eqNum, eqDen + 1),                          // den off by +1   (e.g. 2/5 for 2/4)
+                        (eqNum, Math.Max(2, eqDen - 1)),             // den off by -1   (e.g. 2/3 for 2/4)
+                        (num + 1, den),                              // wrong simplified (e.g. 2/2 for 1/2)
+                        (num, den + 1),                              // wrong simplified (e.g. 1/3 for 1/2)
+                        (num * factor + 1, den * factor + 1),        // both off by +1
+                        (num * (factor + 1), den * factor),          // numerator over-scaled
+                        (num * factor, den * (factor + 1)),          // denominator over-scaled
+                    };
+
+                    foreach (var (cn, cd) in attempts)
+                    {
                         if (opts.Count >= 4) break;
+                        if (cn < 1 || cd < 2 || cd > 99) continue;
+                        if (IsEq(cn, cd)) continue;
+                        string cand = $"{cn}/{cd}";
+                        if (cand == answer || opts.Contains(cand)) continue;
+                        opts.Add(cand);
                     }
 
-                    // Tier 2 distractors: same-denominator but wrong
-                    // numerator (the original idea, but bounded and only
-                    // when there's room in the pool).
+                    // Random non-equivalent fallback if the curated list ran out.
                     int safety = 0;
-                    while (opts.Count < 4 && safety < 30 && eqDen > 2)
+                    while (opts.Count < 4 && safety < 80)
                     {
-                        string cand = $"{rng.Next(1, eqDen)}/{eqDen}";
-                        if (!opts.Contains(cand)) opts.Add(cand);
+                        int cd = rng.Next(2, 12);
+                        int cn = rng.Next(1, cd + 2);
                         safety++;
+                        if (IsEq(cn, cd)) continue;
+                        string cand = $"{cn}/{cd}";
+                        if (cand == answer || opts.Contains(cand)) continue;
+                        opts.Add(cand);
                     }
 
-                    // Tier 3 distractors: completely different fractions
-                    // pulled from a varied pool. Guaranteed to add a new
-                    // entry on each iteration because the search space is
-                    // far bigger than the 4 slots we need to fill.
-                    int fallbackDen = 7;
-                    int fallbackSafety = 0;
-                    while (opts.Count < 4 && fallbackSafety < 40)
-                    {
-                        string cand = $"{rng.Next(1, fallbackDen)}/{fallbackDen}";
-                        if (!opts.Contains(cand)) opts.Add(cand);
-                        fallbackDen++;
-                        fallbackSafety++;
-                    }
-                    // Absolute last resort — pad with synthetic distinct
-                    // strings so we always hand back a valid 4-option array.
+                    // Absolute last resort -- synthetic distinct strings that
+                    // are guaranteed non-equivalent (denominator above 99 can
+                    // never simplify to a small num/den).
                     int pad = 100;
-                    while (opts.Count < 4) opts.Add($"1/{pad++}");
+                    while (opts.Count < 4)
+                    {
+                        string c = $"7/{pad++}";
+                        if (!opts.Contains(c) && c != answer) opts.Add(c);
+                    }
 
                     var arr = opts.ToArray();
                     Shuffle(arr, rng);
@@ -1066,7 +1077,7 @@ namespace MathEdu.Utility
                     string answer = $"{hour:0}:{minute:00}";
                     var opts = new List<string> { answer };
                     // Bounded distractor search: grade 1 only has 12 unique
-                    // "h:00" values so the search space is tiny — without a
+                    // "h:00" values so the search space is tiny -- without a
                     // safety counter a pathological RNG seed could spin here.
                     int safety = 0;
                     while (opts.Count < 4 && safety < 60)
@@ -1310,7 +1321,7 @@ namespace MathEdu.Utility
         /// genuinely broken question via MathQuestion.IsValid() (which fails
         /// on correctIndex &lt; 0) and let the wrapper in Generate() drop it.
         /// The previous behaviour silently returned 0, which marked the
-        /// first option as correct even when the real answer was missing —
+        /// first option as correct even when the real answer was missing --
         /// causing "right answer flagged wrong" bugs in the field.
         /// </summary>
         private static int IndexOf<T>(T[] arr, T value)
