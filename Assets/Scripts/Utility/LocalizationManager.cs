@@ -52,18 +52,23 @@ namespace MathEdu.Utility
                 try { val = string.Format(val, args); }
                 catch { /* malformed format string -> keep raw */ }
             }
-            if (Current == Lang.Arabic && !string.IsNullOrEmpty(val))
-                val = ArabicShaper.Shape(val);
-            return val;
+            // Route through Shape so digit runs get LRE/PDF-wrapped (so a
+            // localized string like "\u0627\u0644\u0646\u062a\u064a\u062c\u0629: 12" doesn't render "12" as
+            // "21" inside the RTL flow) and Arabic letters get cursive
+            // shaping. Shape is a no-op when language is English.
+            return Shape(val);
         }
 
         /// <summary>
         /// Shape Arabic text into its connected/cursive presentation form so
-        /// TextMeshPro renders proper words instead of isolated letters.
+        /// TextMeshPro renders proper words instead of isolated letters,
+        /// and embed every digit run with Unicode LRE/PDF markers so that
+        /// numbers display LTR inside the surrounding RTL flow.
+        ///
         /// Returns the input unchanged when:
         ///   - the input is null/empty,
         ///   - the current language is not Arabic, OR
-        ///   - the input contains no Arabic characters.
+        ///   - the input contains no Arabic characters AND no digits.
         ///
         /// This is the universal entry point for ANY text that may contain
         /// Arabic and could end up on a TMP_Text label - question prompts,
@@ -76,8 +81,82 @@ namespace MathEdu.Utility
         {
             if (string.IsNullOrEmpty(s)) return s;
             if (Current != Lang.Arabic) return s;
-            return ArabicShaper.ContainsArabic(s) ? ArabicShaper.Shape(s) : s;
+            bool hasArabic = ArabicShaper.ContainsArabic(s);
+            bool hasDigit = false;
+            for (int k = 0; k < s.Length; k++)
+                if (s[k] >= '0' && s[k] <= '9') { hasDigit = true; break; }
+            if (!hasArabic && !hasDigit) return s;
+            // Pure number / numeric-expression strings in Arabic mode get
+            // wrapped as ONE LTR block ("1 / 10" should render in that
+            // order, not as "10 / 1" after TMP applies RTL).
+            if (!hasArabic)
+                return "\u202A" + s + "\u202C";
+            // Mixed Arabic + number text: wrap each digit run individually
+            // so the Arabic flows RTL while the numbers stay LTR in place.
+            s = EmbedNumbersLTR(s);
+            return ArabicShaper.Shape(s);
         }
+
+        /// <summary>
+        /// Wrap every run of digits (plus internal "/", ":", ".", "," used
+        /// in fractions / clock times / decimals) with the Unicode strong
+        /// left-to-right embedding markers U+202A (LRE) and U+202C (PDF).
+        ///
+        /// Why this is needed: when TextMeshPro renders a TMP_Text with
+        /// isRightToLeftText = true, in some Unity versions it does a naive
+        /// per-line reversal that flips digit order ("12" -> "21", "100" ->
+        /// "001"). Wrapping numbers with LRE/PDF forces TMP to treat the
+        /// embedded run as LTR regardless of the surrounding direction, so
+        /// the number stays readable.
+        ///
+        /// The markers are invisible - they only influence layout direction.
+        /// Strings that contain no digits are returned unchanged.
+        /// </summary>
+        public static string EmbedNumbersLTR(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            // Quick reject when there are no digits to wrap.
+            bool hasDigit = false;
+            for (int k = 0; k < s.Length; k++)
+                if (s[k] >= '0' && s[k] <= '9') { hasDigit = true; break; }
+            if (!hasDigit) return s;
+
+            var sb = new System.Text.StringBuilder(s.Length + 16);
+            int i = 0;
+            while (i < s.Length)
+            {
+                char ch = s[i];
+                if (!IsAsciiDigit(ch))
+                {
+                    sb.Append(ch);
+                    i++;
+                    continue;
+                }
+                // Found the start of a digit run. Extend through digits,
+                // including punctuation that has digits on BOTH sides.
+                int start = i;
+                int end = i;
+                while (end < s.Length)
+                {
+                    if (IsAsciiDigit(s[end])) { end++; continue; }
+                    char c = s[end];
+                    if ((c == '/' || c == ':' || c == '.' || c == ',') &&
+                        end + 1 < s.Length && IsAsciiDigit(s[end + 1]))
+                    {
+                        end++;
+                        continue;
+                    }
+                    break;
+                }
+                sb.Append('\u202A');           // LRE: force LTR for the number
+                sb.Append(s, start, end - start);
+                sb.Append('\u202C');           // PDF: pop the direction stack
+                i = end;
+            }
+            return sb.ToString();
+        }
+
+        private static bool IsAsciiDigit(char c) => c >= '0' && c <= '9';
 
         /// <summary>
         /// Assign <paramref name="text"/> onto <paramref name="tmp"/>, shaping
