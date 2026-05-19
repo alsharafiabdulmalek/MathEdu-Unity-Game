@@ -28,6 +28,7 @@ using System.Collections.Generic;
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -165,8 +166,13 @@ namespace MathEdu.Gameplay
                 new Vector2(0, 0.88f), new Vector2(1, 1f),
                 HeaderColor, 0, "Header");
 
+            // Header title — fully localized via "gp.header_format"
+            // so the mode name + subject + level read in the player's language.
+            string subjectName = GameManager.Instance.CurrentSubject != null
+                ? GameManager.Instance.CurrentSubject.displayName
+                : "";
             UIFactory.CreateText(header,
-                $"{HeaderTitle} - {GameManager.Instance.CurrentSubject?.displayName} L{_level.levelNumber}",
+                Localization.T("gp.header_format", HeaderTitle, subjectName, _level.levelNumber),
                 40, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
@@ -210,7 +216,7 @@ namespace MathEdu.Gameplay
             le.flexibleWidth = 1;
 
             _scoreLabel = UIFactory.CreateText((RectTransform)stripLayout.transform,
-                "Score: 0", 36, Color.white, TextAlignmentOptions.Right, "ScoreLabel");
+                Localization.T("gp.score", 0), 36, Color.white, TextAlignmentOptions.Right, "ScoreLabel");
 
             // Reaction face — a friendly mascot puck that reacts in real time.
             // Positioned above the question card on the right so it never
@@ -252,7 +258,7 @@ namespace MathEdu.Gameplay
                 hl.childAlignment = TextAnchor.MiddleLeft;
 
                 _hintButton = UIFactory.CreateButton((RectTransform)hintHolder,
-                    "💡 Hint", UIFactory.Accent, 32, "HintBtn");
+                    Localization.T("gp.hint_btn"), UIFactory.Accent, 32, "HintBtn");
                 var hle = _hintButton.gameObject.AddComponent<LayoutElement>();
                 hle.preferredWidth = 220; hle.minWidth = 220;
                 _hintButton.onClick.AddListener(ShowHintNow);
@@ -292,7 +298,9 @@ namespace MathEdu.Gameplay
             }
 
             var q = _questions[_currentIndex];
-            _questionLabel.text = q.prompt;
+            // Question prompts come from QuestionStrings in raw logical-order
+            // Arabic; shape them here so TMP renders connected glyphs.
+            Localization.SetText(_questionLabel, q.prompt);
             _visual.Show(q);
             UpdateHeader();
 
@@ -303,7 +311,10 @@ namespace MathEdu.Gameplay
             for (int i = 0; i < shuffled.options.Length; i++)
             {
                 int captured = i;
-                AnswerButton.Spawn(_answersHolder, captured, shuffled.options[i],
+                // Shape the option text in case it contains Arabic words
+                // (shape names, coin names, "Same"/"Cannot tell", etc.).
+                AnswerButton.Spawn(_answersHolder, captured,
+                    Localization.Shape(shuffled.options[i]),
                     chosen => HandleAnswer(chosen, shuffled));
             }
             _locked = false;
@@ -314,7 +325,7 @@ namespace MathEdu.Gameplay
         {
             _progressLabel.text = $"{_currentIndex + 1} / {_questions.Count}";
             _progressBar.SetValue((float)(_currentIndex + 1) / Mathf.Max(1, _questions.Count));
-            _scoreLabel.text = $"Score: {_score}";
+            Localization.SetText(_scoreLabel, Localization.T("gp.score", _score));
         }
 
         protected virtual void HandleAnswer(int chosenIndex, MathQuestion q)
@@ -338,7 +349,12 @@ namespace MathEdu.Gameplay
                 _currentStreak++;
                 if (_currentStreak > _maxStreak) _maxStreak = _currentStreak;
                 _score += ScoreForCorrect(q);
+                // Layered audio: streak milestones add a bright arpeggio on
+                // top of the regular correct ding so the player feels rewarded
+                // for getting several in a row.
                 GameManager.Instance.Audio.PlaySFX("correct");
+                if (_currentStreak == 3 || _currentStreak == 5 || _currentStreak == 10)
+                    GameManager.Instance.Audio.PlaySFX("streak");
                 GameManager.Instance.VFX?.PlayCorrect();
                 HapticManager.Light();
                 _feedback.ShowCorrect(EncouragementCorrect(_currentStreak), _currentStreak);
@@ -419,8 +435,10 @@ namespace MathEdu.Gameplay
         protected virtual void ShowHintNow()
         {
             if (_hintLabel == null || _currentIndex >= _questions.Count) return;
-            _hintLabel.text = _questions[_currentIndex].hint;
-            GameManager.Instance.Audio.PlaySFX("tap");
+            // Hints come from QuestionStrings in raw logical-order Arabic;
+            // shape on display so cursive Arabic reads as words, not letters.
+            Localization.SetText(_hintLabel, _questions[_currentIndex].hint);
+            GameManager.Instance.Audio.PlaySFX("hint");
         }
 
         // -------------------------------------------------------------------
@@ -447,17 +465,17 @@ namespace MathEdu.Gameplay
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "Paused", 80,
+            UIFactory.CreateText((RectTransform)col.transform, Localization.T("pause.paused"), 80,
                 UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
             var resume = UIFactory.CreateButton((RectTransform)col.transform,
-                "Resume", UIFactory.Success, 42, "Resume");
+                Localization.T("pause.resume"), UIFactory.Success, 42, "Resume");
             resume.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
             resume.onClick.AddListener(HidePauseOverlay);
 
             var restart = UIFactory.CreateButton((RectTransform)col.transform,
-                "Restart", UIFactory.Primary, 42, "Restart");
+                Localization.T("pause.restart"), UIFactory.Primary, 42, "Restart");
             restart.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
             restart.onClick.AddListener(() =>
             {
@@ -466,7 +484,7 @@ namespace MathEdu.Gameplay
             });
 
             var quit = UIFactory.CreateButton((RectTransform)col.transform,
-                "Quit Level", UIFactory.Danger, 42, "Quit");
+                Localization.T("pause.quit_level"), UIFactory.Danger, 42, "Quit");
             quit.gameObject.AddComponent<LayoutElement>().preferredHeight = 130;
             quit.onClick.AddListener(() =>
             {
@@ -506,11 +524,11 @@ namespace MathEdu.Gameplay
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "Quit this level?",
+            UIFactory.CreateText((RectTransform)col.transform, Localization.T("quit.title"),
                 56, UIFactory.TextDark, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
             UIFactory.CreateText((RectTransform)col.transform,
-                "Your progress on this level will be lost.", 32,
+                Localization.T("quit.body"), 32,
                 UIFactory.TextDark, TextAlignmentOptions.Center, "Body");
 
             var row = new GameObject("BtnRow",
@@ -521,11 +539,11 @@ namespace MathEdu.Gameplay
             row.GetComponent<LayoutElement>().preferredHeight = 140;
 
             var stay = UIFactory.CreateButton((RectTransform)row.transform,
-                "Keep playing", UIFactory.Success, 36, "Stay");
+                Localization.T("quit.keep_playing"), UIFactory.Success, 36, "Stay");
             stay.onClick.AddListener(HidePauseOverlay);
 
             var quit = UIFactory.CreateButton((RectTransform)row.transform,
-                "Quit", UIFactory.Danger, 36, "Quit");
+                Localization.T("quit.quit"), UIFactory.Danger, 36, "Quit");
             quit.onClick.AddListener(() =>
             {
                 Time.timeScale = 1f;
@@ -578,16 +596,21 @@ namespace MathEdu.Gameplay
         protected static string EncouragementCorrect(int streak = 0)
         {
             // Special-case streak milestones with extra-celebratory copy.
-            if (streak >= 10) return "Incredible!";
-            if (streak >= 5)  return "On fire!";
-            if (streak >= 3)  return "Streak!";
-            string[] msgs = { "Correct!", "Great job!", "You got it!", "Awesome!", "Brilliant!", "Yes!" };
-            return msgs[Random.Range(0, msgs.Length)];
+            // All strings flow through Localization.T() so they read in the
+            // player's selected language (and Arabic gets cursive shaping).
+            if (streak >= 10) return Localization.T("gp.incredible");
+            if (streak >= 5)  return Localization.T("gp.on_fire");
+            if (streak >= 3)  return Localization.T("gp.streak");
+            string[] keys = {
+                "gp.correct", "gp.great_job", "gp.you_got_it",
+                "gp.awesome", "gp.brilliant", "gp.yes_excl"
+            };
+            return Localization.T(keys[Random.Range(0, keys.Length)]);
         }
 
         protected static string EncouragementWrong(MathQuestion q)
         {
-            return $"Answer was {q.CorrectAnswer}";
+            return Localization.T("gp.wrong_answer_was", q.CorrectAnswer);
         }
     }
 }
