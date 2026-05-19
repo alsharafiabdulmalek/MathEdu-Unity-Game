@@ -267,6 +267,13 @@ namespace MathEdu.Managers
             GameManager.Instance.Audio.PlaySFX("levelComplete");
             _profile.language = lang == Localization.Lang.Arabic ? "ar" : "en";
             Localization.SetLanguage(lang);
+            // Wipe every cached level's questions / lesson text / story text
+            // so they regenerate in the newly-selected language on next access.
+            // (QuestionStrings switches on Localization.IsRTL at generation time
+            // — without this purge, players see the old language until the app
+            // restarts.)
+            MathEdu.Utility.DatabaseBootstrapper.ClearCachedLevelContent(
+                GameManager.Instance.database);
             Save();
             // Reload Settings scene so every string re-renders in the new language.
             GameManager.Instance.UI.Go(UIManager.SceneSettings);

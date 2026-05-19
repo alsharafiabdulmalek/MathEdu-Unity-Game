@@ -23,6 +23,7 @@ using System.Collections;
 using MathEdu.Data;
 using MathEdu.Managers;
 using MathEdu.UI;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -65,8 +66,15 @@ namespace MathEdu.Modes
             var header = UIFactory.CreatePanel(safe,
                 new Vector2(0, 0.88f), new Vector2(1, 1f),
                 UIFactory.Primary, 0, "Header");
+            // Header reads "Learn - Subject Level N" / "تعلّم - المادة المستوى N"
+            // through the shared gp.header_format key so it matches every other
+            // gameplay mode.
+            string subjectName = GameManager.Instance.CurrentSubject != null
+                ? GameManager.Instance.CurrentSubject.displayName
+                : "";
             UIFactory.CreateText(header,
-                $"Learn - {GameManager.Instance.CurrentSubject?.displayName} L{_level.levelNumber}",
+                Localization.T("gp.header_format",
+                    Localization.T("modesel.learn"), subjectName, _level.levelNumber),
                 42, Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
             var back = IconService.IconButton(header, "back", "<", new Color(0, 0, 0, 0.3f), "Back");
@@ -135,12 +143,12 @@ namespace MathEdu.Modes
         // -------------------------------------------------------------------
         private IEnumerator IntroFlow()
         {
-            _stageLabel.text = "Lesson";
-            _bodyLabel.text  = _level.lessonIntro;
-            _hintLabel.text  = _level.lessonExample;
+            Localization.SetText(_stageLabel, Localization.T("learn.lesson"));
+            Localization.SetText(_bodyLabel,  _level.lessonIntro);
+            Localization.SetText(_hintLabel,  _level.lessonExample);
             ClearAnswers();
 
-            _host?.Speak("Welcome! Let's learn together.", 2.5f);
+            _host?.Speak(Localization.T("learn.host_welcome"), 2.5f);
             _host?.React(MascotHost.Mood.Happy);
 
             yield return new WaitForSeconds(2.5f);
@@ -156,12 +164,12 @@ namespace MathEdu.Modes
             }
 
             // Transition
-            _stageLabel.text = "Practice";
-            _bodyLabel.text  = "Now it's YOUR turn! 💪";
-            _hintLabel.text  = _level.lessonTip;
+            Localization.SetText(_stageLabel, Localization.T("learn.practice"));
+            Localization.SetText(_bodyLabel,  Localization.T("learn.your_turn"));
+            Localization.SetText(_hintLabel,  _level.lessonTip);
             ClearAnswers();
             _host?.React(MascotHost.Mood.Cheer);
-            _host?.Speak("You've got this!", 1.6f);
+            _host?.Speak(Localization.T("learn.host_youve_got_this"), 1.6f);
             yield return new WaitForSeconds(1.5f);
 
             // 7 practice questions
@@ -175,17 +183,18 @@ namespace MathEdu.Modes
             }
 
             // Wrap-up
-            _stageLabel.text = "Done!";
-            _bodyLabel.text  = "Great job — you finished the lesson!";
-            _hintLabel.text  = "Try Practice or Quiz mode next.";
+            Localization.SetText(_stageLabel, Localization.T("learn.done"));
+            Localization.SetText(_bodyLabel,  Localization.T("learn.done_body"));
+            Localization.SetText(_hintLabel,  Localization.T("learn.done_sub"));
             ClearAnswers();
             _host?.React(MascotHost.Mood.Cheer);
-            _host?.Speak("Brilliant work!", 3.0f);
+            _host?.Speak(Localization.T("learn.host_brilliant"), 3.0f);
+            GameManager.Instance.Audio.PlaySFX("levelComplete");
             EmojiBurst.Cheer(_safeArea, new Vector2(_safeArea.rect.width * 0.5f,
                                                     _safeArea.rect.height * 0.5f));
-            AddCTA("Back to modes",
+            AddCTA(Localization.T("learn.back_to_modes"),
                 () => GameManager.Instance.UI.Go(UIManager.SceneModeSelect));
-            AddCTA("Practice now", () =>
+            AddCTA(Localization.T("learn.practice_now"), () =>
             {
                 GameManager.Instance.SelectMode(LearningMode.Practice);
                 GameManager.Instance.UI.Go(UIManager.ScenePractice);
@@ -194,8 +203,8 @@ namespace MathEdu.Modes
 
         private IEnumerator PlayExample(int idx, MathQuestion q)
         {
-            _stageLabel.text = $"Example {idx} / {ExampleCount}";
-            _bodyLabel.text  = q.prompt;
+            Localization.SetText(_stageLabel, Localization.T("learn.example_x_of_y", idx, ExampleCount));
+            Localization.SetText(_bodyLabel,  q.prompt);
             _hintLabel.text  = "";
             ClearAnswers();
 
@@ -203,7 +212,9 @@ namespace MathEdu.Modes
             var btns = new Button[q.options.Length];
             for (int i = 0; i < q.options.Length; i++)
             {
-                btns[i] = UIFactory.CreateButton(_answersHolder, q.options[i],
+                // Shape Arabic-bearing options (shape names, "Same", coin names…).
+                btns[i] = UIFactory.CreateButton(_answersHolder,
+                    Localization.Shape(q.options[i]),
                     UIFactory.Card, 40, $"Ex_{idx}_{i}");
                 var lbl = btns[i].GetComponentInChildren<TextMeshProUGUI>();
                 lbl.color = UIFactory.TextDark;
@@ -224,7 +235,7 @@ namespace MathEdu.Modes
                 lbl.color = Color.white;
                 GameManager.Instance.Audio.PlaySFX("correct");
             }
-            _hintLabel.text = $"💡 {q.hint}";
+            Localization.SetText(_hintLabel, "\ud83d\udca1 " + q.hint);
 
             // 2.5s more, then fade out.
             yield return new WaitForSeconds(2.5f);
@@ -233,9 +244,9 @@ namespace MathEdu.Modes
 
         private IEnumerator PlayPractice(MathQuestion q, int idx)
         {
-            _stageLabel.text = $"Practice {idx} / {PracticeCount}";
-            _bodyLabel.text  = q.prompt;
-            _hintLabel.text  = $"💡 {q.hint}";
+            Localization.SetText(_stageLabel, Localization.T("learn.practice_x_of_y", idx, PracticeCount));
+            Localization.SetText(_bodyLabel,  q.prompt);
+            Localization.SetText(_hintLabel,  "\ud83d\udca1 " + q.hint);
             ClearAnswers();
             _locked = false;
 
@@ -246,7 +257,8 @@ namespace MathEdu.Modes
             for (int i = 0; i < shuffled.options.Length; i++)
             {
                 int captured = i;
-                var btn = UIFactory.CreateButton(_answersHolder, shuffled.options[i],
+                var btn = UIFactory.CreateButton(_answersHolder,
+                    Localization.Shape(shuffled.options[i]),
                     UIFactory.Card, 40, $"Pra_{idx}_{i}");
                 var lbl = btn.GetComponentInChildren<TextMeshProUGUI>();
                 lbl.color = UIFactory.TextDark;
@@ -273,7 +285,7 @@ namespace MathEdu.Modes
                         img.color = UIFactory.Danger;
                         GameManager.Instance.Audio.PlaySFX("wrong");
                         _host?.React(MascotHost.Mood.Sad);
-                        _host?.Speak("Try again — you can do it!", 1.6f);
+                        _host?.Speak(Localization.T("learn.host_try_again"), 1.6f);
                     }
                 });
             }

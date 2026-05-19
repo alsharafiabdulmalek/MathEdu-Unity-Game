@@ -21,6 +21,7 @@
 // -----------------------------------------------------------------------------
 
 using System.Collections;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -168,7 +169,9 @@ namespace MathEdu.UI
         public void Speak(string text, float duration = 3.0f)
         {
             if (_bubbleRoutine != null) StopCoroutine(_bubbleRoutine);
-            _bubbleText.text = text;
+            // Shape Arabic so the mascot's speech bubble shows connected
+            // cursive words. Pass-through for English / numeric strings.
+            Localization.SetText(_bubbleText, text);
             _bubbleRoutine = StartCoroutine(BubbleSequence(duration));
         }
 

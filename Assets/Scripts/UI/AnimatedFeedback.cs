@@ -25,6 +25,7 @@
 // -----------------------------------------------------------------------------
 
 using System.Collections;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -110,7 +111,7 @@ namespace MathEdu.UI
             return fb;
         }
 
-        public void ShowCorrect(string msg = "Correct!", int streakCount = 0)
+        public void ShowCorrect(string msg = null, int streakCount = 0)
         {
             // Re-activate BEFORE StartCoroutine. Unity won't start coroutines
             // on inactive GameObjects, and PopFade's own SetActive(true) is
@@ -118,18 +119,23 @@ namespace MathEdu.UI
             if (!gameObject.activeSelf) gameObject.SetActive(true);
             StopAllCoroutines();
             _bg.color = streakCount >= 3 ? new Color(0.20f, 0.85f, 0.50f) : UIFactory.Success;
-            _label.text = (streakCount >= 3 ? $"x{streakCount} " : "✓ ") + msg;
+            if (string.IsNullOrEmpty(msg)) msg = Localization.T("gp.correct");
+            // Use the localization helper so cursive Arabic shapes correctly
+            // even though we're prefixing with a checkmark / "x{streak}".
+            Localization.SetText(_label,
+                (streakCount >= 3 ? $"x{streakCount} " : "\u2713 ") + msg);
             SetFace(streakCount >= 3 ? "cheer" : "happy");
             SpawnBurst(streakCount);
             StartCoroutine(PopFade(streakCount >= 3 ? 1.35f : 1.20f));
         }
 
-        public void ShowWrong(string msg = "Try again", bool surprised = false)
+        public void ShowWrong(string msg = null, bool surprised = false)
         {
             if (!gameObject.activeSelf) gameObject.SetActive(true);
             StopAllCoroutines();
             _bg.color = surprised ? new Color(0.95f, 0.55f, 0.20f) : UIFactory.Danger;
-            _label.text = "✗ " + msg;
+            if (string.IsNullOrEmpty(msg)) msg = Localization.T("gp.try_again");
+            Localization.SetText(_label, "\u2717 " + msg);
             SetFace(surprised ? "surprised" : "sad");
             SpawnWrongBurst();
             StartCoroutine(PopFade(1.10f));
