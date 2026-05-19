@@ -57,6 +57,41 @@ namespace MathEdu.Utility
             return val;
         }
 
+        /// <summary>
+        /// Shape Arabic text into its connected/cursive presentation form so
+        /// TextMeshPro renders proper words instead of isolated letters.
+        /// Returns the input unchanged when:
+        ///   - the input is null/empty,
+        ///   - the current language is not Arabic, OR
+        ///   - the input contains no Arabic characters.
+        ///
+        /// This is the universal entry point for ANY text that may contain
+        /// Arabic and could end up on a TMP_Text label - question prompts,
+        /// hints, explanations, dynamic answer options, score labels, etc.
+        /// It is safe to call on already-shaped text (the shaper is a no-op
+        /// on presentation-form codepoints because they aren't in its lookup
+        /// table) and on pure-English / numeric text.
+        /// </summary>
+        public static string Shape(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            if (Current != Lang.Arabic) return s;
+            return ArabicShaper.ContainsArabic(s) ? ArabicShaper.Shape(s) : s;
+        }
+
+        /// <summary>
+        /// Assign <paramref name="text"/> onto <paramref name="tmp"/>, shaping
+        /// any Arabic inside it first and applying the Arabic font + RTL flag.
+        /// One-call replacement for `tmp.text = text` whenever the text may
+        /// contain Arabic (i.e. anywhere user-facing content is rendered).
+        /// </summary>
+        public static void SetText(TMP_Text tmp, string text)
+        {
+            if (tmp == null) return;
+            tmp.text = Shape(text);
+            Apply(tmp);
+        }
+
         public static TMP_FontAsset ArabicFont
         {
             get
