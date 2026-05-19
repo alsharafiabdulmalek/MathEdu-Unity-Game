@@ -331,7 +331,10 @@ namespace MathEdu.Gameplay
 
         protected void UpdateHeader()
         {
-            _progressLabel.text = $"{_currentIndex + 1} / {_questions.Count}";
+            // Route the progress text through Localization.SetText so the
+            // digit groups get LRE/PDF-wrapped in Arabic mode (otherwise
+            // "1 / 10" would render as "01 / 1" inside the RTL flow).
+            Localization.SetText(_progressLabel, $"{_currentIndex + 1} / {_questions.Count}");
             _progressBar.SetValue((float)(_currentIndex + 1) / Mathf.Max(1, _questions.Count));
             Localization.SetText(_scoreLabel, Localization.T("gp.score", _score));
         }
