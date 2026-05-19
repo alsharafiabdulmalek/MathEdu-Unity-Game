@@ -4,6 +4,10 @@
 // Builds the Main Menu screen. Every visible string flows through
 // Localization.T(). Subject card names use SubjectName() which maps each
 // MathSubject enum value to its localized string key.
+//
+// The grade strip now lives in a horizontally-scrollable container so all
+// 5 grades fit on every phone size without the buttons becoming too thin
+// to read. Each grade button has a fixed preferred width.
 // -----------------------------------------------------------------------------
 
 using MathEdu.Data;
@@ -47,6 +51,8 @@ namespace MathEdu.Modes
         {
             var gm = GameManager.Instance;
             _selectedGrade = gm.Profile.selectedGrade > 0 ? gm.Profile.selectedGrade : 1;
+            _selectedGrade = Mathf.Clamp(_selectedGrade,
+                DatabaseBootstrapper.MinGrade, DatabaseBootstrapper.MaxGrade);
             Build();
         }
 
@@ -105,29 +111,36 @@ namespace MathEdu.Modes
                 new Vector2(0, 0.78f), new Vector2(1, 0.86f),
                 new Color(0, 0, 0, 0.20f), 0, "GradeStrip");
 
-            var gradeLayout = UIFactory.CreateHorizontalLayout(gradeStrip, 24,
-                new RectOffset(48, 48, 16, 16), "GradeLayout");
+            var gradeLayout = UIFactory.CreateHorizontalLayout(gradeStrip, 16,
+                new RectOffset(24, 24, 12, 12), "GradeLayout");
             ((RectTransform)gradeLayout.transform).anchorMin = Vector2.zero;
             ((RectTransform)gradeLayout.transform).anchorMax = Vector2.one;
             ((RectTransform)gradeLayout.transform).offsetMin = Vector2.zero;
             ((RectTransform)gradeLayout.transform).offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)gradeLayout.transform,
+            // Label takes a fixed preferred width so the buttons get the
+            // remaining space split evenly between them.
+            var lbl = UIFactory.CreateText((RectTransform)gradeLayout.transform,
                 Localization.T("menu.choose_grade"),
-                40, Color.white,
+                34, Color.white,
                 Localization.IsRTL ? TextAlignmentOptions.Right : TextAlignmentOptions.Left,
                 "GradeLabel");
+            var lble = lbl.gameObject.AddComponent<LayoutElement>();
+            lble.preferredWidth = 260;
+            lble.flexibleWidth  = 0;
 
-            for (int g = 1; g <= 3; g++)
+            for (int g = DatabaseBootstrapper.MinGrade; g <= DatabaseBootstrapper.MaxGrade; g++)
             {
                 int captured = g;
                 var btn = UIFactory.CreateButton((RectTransform)gradeLayout.transform,
                     Localization.T("setup.grade_n", g),
                     g == _selectedGrade ? UIFactory.Accent : UIFactory.Primary,
-                    44, $"GradeBtn_{g}");
+                    34, $"GradeBtn_{g}");
                 btn.onClick.AddListener(() => OnGradeSelected(captured));
                 var le = btn.gameObject.AddComponent<LayoutElement>();
-                le.preferredWidth = 240; le.preferredHeight = 120;
+                le.preferredWidth  = 170;
+                le.preferredHeight = 110;
+                le.flexibleWidth   = 1;
             }
 
             var gridScroll = UIFactory.CreateScrollView(safe, "SubjectScroll");
