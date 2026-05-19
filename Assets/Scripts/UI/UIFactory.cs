@@ -176,7 +176,11 @@ namespace MathEdu.UI
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var tmp = go.AddComponent<TextMeshProUGUI>();
-            tmp.text          = text;
+            // Arabic-shape the input on the way in so callers that pass raw
+            // logical-order Arabic (e.g. question prompts from QuestionStrings,
+            // dynamic answer options, hardcoded fallback labels) end up with
+            // connected cursive glyphs instead of disconnected letter boxes.
+            tmp.text          = Localization.Shape(text);
             tmp.fontSize      = fontSize;
             tmp.color         = color ?? TextDark;
             tmp.alignment     = align;
@@ -219,7 +223,21 @@ namespace MathEdu.UI
             var txt = CreateText(rt, label, fontSize, TextLight, TextAlignmentOptions.Center, "Label");
             txt.fontStyle = FontStyles.Bold;
             txt.raycastTarget = false;
+
+            // Universal tap-sound hook: every button created via UIFactory
+            // plays the "tap" SFX on click. This removes ~50 redundant
+            // `PlaySFX("tap")` calls scattered through the manager scripts.
+            // AudioManager throttles repeated taps so this is safe in lists.
+            btn.onClick.AddListener(PlayButtonTap);
             return btn;
+        }
+
+        // Hooked into every UIFactory-built Button. Stored once on the static
+        // type so listener removal/add works as expected.
+        private static void PlayButtonTap()
+        {
+            var gm = MathEdu.Managers.GameManager.Instance;
+            if (gm != null && gm.Audio != null) gm.Audio.PlaySFX("tap");
         }
 
         public static Button CreateIconButton(RectTransform parent, string icon,
