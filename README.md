@@ -220,16 +220,16 @@ Assets/
 │   │   └── SaveSystem.cs              # JSON + PlayerPrefs persistence
 │   ├── Managers/
 │   │   ├── GameManager.cs             # Root singleton (standalone-scene safe)
-│   │   ├── AudioManager.cs            # Named PlaySFX, 10 procedural clips
+│   │   ├── AudioManager.cs            # Named PlaySFX, 13 stereo procedural clips + ambient loop
 │   │   ├── HapticManager.cs           # Static wrapper around Handheld.Vibrate
 │   │   ├── ProgressManager.cs         # Full badge taxonomy + SessionResult
-│   │   ├── UIManager.cs               # Scene transitions with fade
+│   │   ├── UIManager.cs               # Scene transitions with fade + per-scene music swap
 │   │   ├── VFXManager.cs              # Epic Toon FX hooks
 │   │   ├── PlayerSetupManager.cs      # First-launch screen
-│   │   ├── SettingsManager.cs         # Music/SFX/Haptics + PIN change flow
+│   │   ├── SettingsManager.cs         # Music/SFX/Haptics + PIN change flow + language switch
 │   │   └── ParentalDashboardManager.cs# 10-key PIN gate + slide-up reveal
 │   ├── UI/
-│   │   ├── UIFactory.cs               # Theme-aware procedural Canvas/TMP builder
+│   │   ├── UIFactory.cs               # Theme-aware procedural Canvas/TMP builder + auto Arabic shaping
 │   │   ├── UIThemeService.cs
 │   │   ├── IconService.cs             # POLISH: sprite-first / glyph-fallback facade
 │   │   ├── DefaultSprite.cs           # Procedural rounded-rect, gradient, circle
@@ -358,9 +358,9 @@ header shows a 🏅 count.
    ├── AvatarLibrary        (from Resources OR built procedurally)
    ├── PlayerProfile        (loaded by SaveSystem)
    ├── GameSession          (grade / subject / level / mode + lastResult)
-   ├── AudioManager         (named PlaySFX with 10 procedural clip fallbacks)
+   ├── AudioManager         (named PlaySFX with 13 stereo procedural clips + ambient loop)
    ├── ProgressManager      (records subject stats, awards badges)
-   ├── UIManager            (scene transitions with fade + page-transition SFX)
+   ├── UIManager            (scene transitions with fade + menu/gameplay music swap)
    └── VFXManager           (Epic Toon FX hooks)
 
 [UIThemeService]            (Resources/UITheme.asset, drives panel/button/slider sprites)
@@ -386,9 +386,23 @@ header shows a 🏅 count.
   recognisable.
 - **Procedural fallback content + audio.** If no `MathDatabase.asset` is
   present, `DatabaseBootstrapper.BuildInMemory()` constructs ~4,800
-  questions at runtime. AudioManager generates pleasant SFX procedurally
-  for **all 10 named clips** (correct, wrong, tap, levelComplete,
-  starReveal, timerTick, timerExpire, pageTransition, badgeUnlocked, lose).
+  questions at runtime. AudioManager generates rich stereo SFX procedurally
+  for **all 13 named clips** (correct, wrong, tap, hint, levelComplete,
+  starReveal, streak, timerTick, timerExpire, pageTransition, badgeUnlocked,
+  lose, swoosh) with ADSR envelopes, chord stacks and gentle pitch jitter so
+  repeated taps feel organic. A 12‑second seamless ambient loop is also
+  generated when no `music_menu` / `music_play` clip is supplied — UIManager
+  swaps between menu and gameplay tracks on every scene transition.
+- **Full English ↔ Arabic localization.** Every UI string (menus, buttons,
+  pause overlay, results, parental dashboard) and every question prompt,
+  hint, lesson and story flows through `Localization.T()`. The custom
+  `ArabicShaper` (`Assets/Scripts/Utility/ArabicShaper.cs`) walks each
+  Arabic string and substitutes the correct **initial / medial / final /
+  isolated** presentation-form glyph for each letter — including the
+  lam-alef ligature — so TextMeshPro renders proper **connected cursive
+  Arabic** instead of disconnected isolated letters. Switching language in
+  Settings purges every cached level's content so the next question
+  re-generates in the new language with no app restart.
 - **Single save file** at `Application.persistentDataPath/player_profile.json`
   with a redundant copy in PlayerPrefs for platforms with finicky file I/O.
 - **Single consolidated database asset.** The default build writes ONE
@@ -406,7 +420,7 @@ Bootstrap
     │  (1.5 s animated splash with 📚 mark)
     │  if (!profile.setupComplete)
     ▼
-PlayerSetup ─────────────► Name + Avatar (with GUI Pro character art) + Grade
+PlayerSetup ─────────► Name + Avatar (with GUI Pro character art) + Grade
     │
     ▼ (Start Playing)
 MainMenu  ────────────────► Grade buttons (1, 2, 3)
@@ -536,9 +550,11 @@ no‑ops — gameplay is never blocked by missing VFX assets.
   without third‑party packages. That maps to a "peek/pop" notification on
   iOS rather than the modern UIImpactFeedbackGenerator. A native plugin
   bridge can be wired in by replacing `HapticManager.Light/Medium/Heavy()`.
-- **Language toggle** in Settings is a placeholder — the i18n strings
-  inside `QuestionGenerator` and the mode managers are already isolated so
-  the swap‑in is straightforward.
+- **Language toggle** is fully wired up — English ↔ Arabic. Question
+  prompts, hints, lessons, story copy, UI menus and parental dashboard all
+  re-render in the player's language. Switching mid‑play purges every
+  cached level's content via `DatabaseBootstrapper.ClearCachedLevelContent`
+  so the next question reads in the new language with no app restart.
 - **Editor scene authoring is intentionally minimal**: each scene contains
   only one GameObject. Everything visible is built at runtime from
   `UIFactory`. If you want hand-authored prefabs, build them under
@@ -565,7 +581,9 @@ is fully featured.
 
 ## Roadmap
 
-- 🌍 Localisation (i18n keys already isolated in `QuestionGenerator`)
+- 🌍 More language packs — the English/Arabic pipeline already runs every
+  string through `Localization.T()` + `ArabicShaper.Shape()`; adding a third
+  language is just one more dictionary in `LocalizationManager.cs`.
 - 👤 Multi‑profile support (file naming already partitioned)
 - 🏅 Daily streak rewards + push notifications (foundation in
   `PlayerProfile.playDays` + `consecutiveDayStreak`)
