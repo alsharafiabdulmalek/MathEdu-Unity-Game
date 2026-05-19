@@ -1,6 +1,6 @@
 # MathEdu — Unity 6 Mobile Math Game
 
-> **Grades 1‑3 · 11 math subjects · 5 learning modes · 20 levels each · ScriptableObject‑driven**
+> **Grades 1‑5 · 11 math subjects · 5 learning modes · 20 levels each · Bilingual (English + Arabic) · ScriptableObject‑driven**
 >
 > A complete Unity **6000.4.4f1** mobile project (Android + iOS) that teaches
 > kids math through games. The entire UI is built procedurally from C# +
@@ -45,7 +45,10 @@ running the steps individually, see the [Quick start](#quick-start) section.)
 
 No null reference exceptions in Console during any of the above. All 5
 learning modes (Learn / Practice / Quiz / Story / Speed Round) are playable
-from Level 1 of every subject across grades 1–3.
+from Level 1 of every subject across **grades 1–5**, in both **English and
+Arabic** (Settings → 🌐 Language toggles instantly; every question, hint,
+lesson example and story prompt re-renders in the chosen language without a
+restart).
 
 ---
 
@@ -92,10 +95,11 @@ from Level 1 of every subject across grades 1–3.
    even on a constrained machine.
 
    #### Path B — three clicks (same result, more visible)
-   - `MathEdu → Build Default Database` — generates ~4,800 questions as
-     a single consolidated `MathDatabase.asset` in `Assets/Resources/`
-     with every Grade / Subject / Level as a nested sub-asset (typically
-     3–10 seconds, even on a slow Mac).
+   - `MathEdu → Build Default Database` — generates ~9,400 questions (5
+     grades × ~47 subject-tracks × 20 levels × 10 questions) as a single
+     consolidated `MathDatabase.asset` in `Assets/Resources/` with every
+     Grade / Subject / Level as a nested sub-asset (typically a few seconds
+     on a modern Mac).
    - `MathEdu → Build Default Avatar Library` — 10 emoji avatars under
      `Assets/ScriptableObjects/Avatars` + a Resources copy.
    - `MathEdu → Build All Scenes` — creates the **13 scenes** under
@@ -103,7 +107,7 @@ from Level 1 of every subject across grades 1–3.
 
    #### Path C — no database build at all
    The game runs without any of the build menus. `GameManager.EnsureDatabase()`
-   builds a 4,800-question content tree in memory at startup via
+   builds a ~9,400-question content tree in memory at startup via
    `DatabaseBootstrapper.BuildInMemory()`. You only need:
    - `MathEdu → Build All Scenes` (~5 s; required because Unity needs registered scenes)
    - Optional: `MathEdu → Build Default Avatar Library` (also has a runtime fallback)
@@ -288,22 +292,30 @@ problems** with named characters and scaffolded multi-step hints — the
 hints walk the player through the operations rather than just stating the
 formula.
 
-| Subject | Grade 1 | Grade 2 | Grade 3 |
-|---|---|---|---|
-| Counting | ✅ 1–30 | ✅ skip 2/5/10/25 | – |
-| Addition | ✅ within 100 (L20 max) | ✅ within 999 | ✅ within 9999 |
-| Subtraction | ✅ within 100 | ✅ within 999 | ✅ within 9999 |
-| Multiplication | – | ✅ x2/5/10 → x1‑10 | ✅ tables 1‑12 + word |
-| Division | – | – | ✅ within 144, word problems L11+ |
-| Shapes | ✅ 2‑D | ✅ 2‑D → 3‑D (L11+) | ✅ perimeter / area |
-| Patterns | ✅ AB / ABB / ABBC (emoji) | ✅ longer patterns | ✅ number patterns (+N, ×N) |
-| Fractions | – | ✅ halves / thirds / fifths | ✅ equivalent fractions |
-| Measurement | ✅ compare | ✅ pick the unit | ✅ unit conversions (cm→m, m→km, …) |
-| Time | ✅ to the hour | ✅ ¼ / 5‑min / odd | ✅ to the minute, **elapsed time L11+** |
-| Money | ✅ coin recognition | ✅ totals (more coins) | ✅ making change, multi-step purchases |
+| Subject | Grade 1 | Grade 2 | Grade 3 | Grade 4 | Grade 5 |
+|---|---|---|---|---|---|
+| Counting | ✅ 1–30 | ✅ skip 2/5/10/25 | – | – | – |
+| Addition | ✅ within 100 | ✅ within 999 | ✅ within 9999 | ✅ within 99 999 + city-population word problems | ✅ within 999 999 |
+| Subtraction | ✅ within 100 | ✅ within 999 | ✅ within 9999 | ✅ within 99 999 + factory built/sold problems | ✅ within 999 999 |
+| Multiplication | – | ✅ ×2/5/10 → ×1‑10 | ✅ tables 1‑12 + word | ✅ 2‑digit × 1‑/2‑digit, school-bus problems | ✅ 3‑digit × 1‑digit, 2‑digit × 2‑digit |
+| Division | – | – | ✅ within 144, word problems L11+ | ✅ **with remainders**, share-the-cards problems | ✅ **long division**, 2-digit divisors |
+| Shapes | ✅ 2‑D | ✅ 2‑D → 3‑D (L11+) | ✅ perimeter / area | ✅ **triangle area**, **angle classification** (acute/right/obtuse/straight) | ✅ **volume** of cube + rectangular prism |
+| Patterns | ✅ AB / ABB / ABBC (emoji) | ✅ longer patterns | ✅ number patterns (+N, ×N) | ✅ **find the rule** (constant +N or ×N) | ✅ **term-rule** (2n+1, n², 3n−2, n(n+1)/2) |
+| Fractions | – | ✅ halves / thirds / fifths | ✅ equivalent fractions | ✅ **add/subtract same denom**, compare | ✅ **add/subtract unlike denominators** |
+| Measurement | ✅ compare | ✅ pick the unit | ✅ unit conversions (cm→m, m→km, …) | ✅ **compound conversion** (km+m, kg+g, l+ml), room area in m² | ✅ larger compound + bigger areas |
+| Time | ✅ to the hour | ✅ ¼ / 5‑min / odd | ✅ to the minute, elapsed time L11+ | ✅ **24-hour ↔ 12-hour**, add a duration | ✅ multi-leg journey total |
+| Money | ✅ coin recognition | ✅ totals (more coins) | ✅ making change, multi-step purchases | ✅ **multi-item bills**, two-line receipts | ✅ **percentages**, **discounts** (% off) |
 
 L11–L15 = single-step word problems, L16–L19 = two-step,
-L20 = three-step "challenge" at the grade's max range.
+L20 = three-step "challenge" at the grade's max range
+(Grade 1 = 100 · Grade 2 = 999 · Grade 3 = 9 999 ·
+**Grade 4 = 99 999 · Grade 5 = 999 999**).
+
+Every prompt, hint, lesson example, story intro/outro and option label is
+fully bilingual — the same procedural generator emits English when the
+language is set to `en` and Arabic when set to `ar`. Numbers stay in
+Western-Arabic digits (0–9) so the math symbols read identically across
+languages, while Arabic prose uses Arabic punctuation (، ؟ etc.).
 
 ---
 
@@ -337,8 +349,8 @@ Earned automatically by `ProgressManager.MaybeAwardMetaBadges()`:
 | Badge | Trigger |
 |---|---|
 | 🌱 **First Step** | Complete any level with ≥1 star for the first time |
-| 🎓 **{Subject} Apprentice (G1/2/3)** | Clear Level 5 of a subject (per grade) |
-| 🏆 **{Subject} Master (G1/2/3)** | Clear Level 20 with 3 stars |
+| 🎓 **{Subject} Apprentice (G1‑5)** | Clear Level 5 of a subject (per grade) |
+| 🏆 **{Subject} Master (G1‑5)** | Clear Level 20 with 3 stars |
 | 🛤 **Half Way There** | Complete any subject's Level 10 |
 | ⚡ **Speed Demon** | Survive 25 correct‑in‑a‑row in Speed Round |
 | 💯 **Perfect Score** | Get 10/10 in Quiz Mode |
@@ -385,14 +397,15 @@ header shows a 🏅 count.
   to the emoji glyph supplied by the caller so every screen is always
   recognisable.
 - **Procedural fallback content + audio.** If no `MathDatabase.asset` is
-  present, `DatabaseBootstrapper.BuildInMemory()` constructs ~4,800
-  questions at runtime. AudioManager generates rich stereo SFX procedurally
-  for **all 13 named clips** (correct, wrong, tap, hint, levelComplete,
-  starReveal, streak, timerTick, timerExpire, pageTransition, badgeUnlocked,
-  lose, swoosh) with ADSR envelopes, chord stacks and gentle pitch jitter so
-  repeated taps feel organic. A 12‑second seamless ambient loop is also
-  generated when no `music_menu` / `music_play` clip is supplied — UIManager
-  swaps between menu and gameplay tracks on every scene transition.
+  present, `DatabaseBootstrapper.BuildInMemory()` constructs ~9,400
+  questions at runtime (5 grades). AudioManager generates rich stereo SFX
+  procedurally for **all 13 named clips** (correct, wrong, tap, hint,
+  levelComplete, starReveal, streak, timerTick, timerExpire, pageTransition,
+  badgeUnlocked, lose, swoosh) with ADSR envelopes, chord stacks and gentle
+  pitch jitter so repeated taps feel organic. A 12‑second seamless ambient
+  loop is also generated when no `music_menu` / `music_play` clip is
+  supplied — UIManager swaps between menu and gameplay tracks on every
+  scene transition.
 - **Full English ↔ Arabic localization.** Every UI string (menus, buttons,
   pause overlay, results, parental dashboard) and every question prompt,
   hint, lesson and story flows through `Localization.T()`. The custom
@@ -420,10 +433,10 @@ Bootstrap
     │  (1.5 s animated splash with 📚 mark)
     │  if (!profile.setupComplete)
     ▼
-PlayerSetup ─────────► Name + Avatar (with GUI Pro character art) + Grade
+PlayerSetup ─────────► Name + Avatar (with GUI Pro character art) + Grade (1-5)
     │
     ▼ (Start Playing)
-MainMenu  ────────────────► Grade buttons (1, 2, 3)
+MainMenu  ────────────────► Grade buttons (1, 2, 3, 4, 5)
                             Subject grid (per-grade) — progress bar +
                             "Level X / 20" / stars, or "Tap to start!"
                             ⚙ Settings  /  👪 Parental Dashboard
@@ -500,7 +513,7 @@ no‑ops — gameplay is never blocked by missing VFX assets.
 | `MathEdu / ⚡ Quick Start (No DB Build — Recommended)` | Avatars + scenes only. Database is built in memory at startup. | < 30 s |
 | `MathEdu / Run Full Setup (writes DB asset — may be slow on low-RAM Macs)` | Also writes the DB asset on disk. | < 60 s typical, longer on constrained machines |
 | `MathEdu / Build All Scenes` | Creates **13** `.unity` scenes and registers them in Build Settings. | ~5 s |
-| `MathEdu / Build Default Database` | Generates the full curriculum as ONE consolidated `MathDatabase.asset` in `Assets/Resources/`. | **3–10 s** |
+| `MathEdu / Build Default Database` | Generates the full curriculum (grades 1-5) as ONE consolidated `MathDatabase.asset` in `Assets/Resources/`. | **~10 s** |
 | `MathEdu / Build Default Avatar Library` | 10 emoji avatars under `Assets/ScriptableObjects/Avatars/` + a Resources copy. | ~1 s |
 | `MathEdu / Polish / Build Default UI Theme & Icon Library` | Re-builds just the polish assets (theme + icons + avatar sprite wiring) — useful after dropping in new art. | ~3 s |
 | `MathEdu / Polish / Wipe Polish Assets` | Deletes `UITheme.asset` + `IconLibrary.asset`. | < 1 s |
@@ -514,12 +527,15 @@ no‑ops — gameplay is never blocked by missing VFX assets.
 | `MathEdu / Advanced / Per-Grade Assets / Build Grade 1 Files` | Builds the Grade 1 subtree as **individual per-level `.asset` files** under `Assets/ScriptableObjects/Grades/Grade1/`. Properly batched. Independent and resumable. |
 | `MathEdu / Advanced / Per-Grade Assets / Build Grade 2 Files` | Same as above for Grade 2. |
 | `MathEdu / Advanced / Per-Grade Assets / Build Grade 3 Files` | Same as above for Grade 3. |
+| `MathEdu / Advanced / Per-Grade Assets / Build Grade 4 Files` | Same as above for Grade 4 (10 subjects × 20 levels). |
+| `MathEdu / Advanced / Per-Grade Assets / Build Grade 5 Files` | Same as above for Grade 5 (10 subjects × 20 levels). |
 | `MathEdu / Advanced / Per-Grade Assets / Rebuild Master Index` | After building one or more grades via the per-file builders, this re-creates `MathDatabase.asset` to point at the on-disk grade assets. |
+| `MathEdu / Advanced / Per-Subject Assets / Grade N - {Subject}` | One-subject-at-a-time builder (20 levels). Useful for diagnostics or very constrained machines. Available for grades 1-5 across all relevant subjects. |
 | `MathEdu / Advanced / Use Runtime Database Only (no build)` | Shows an in-Editor popup explaining that `GameManager.EnsureDatabase()` builds the database in memory at startup if no asset is present. |
 | `MathEdu / Advanced / Open Save File Location` | Reveals `Application.persistentDataPath` in Finder / Explorer. |
 
 > **Performance note.** The default `Build Default Database` is the
-> consolidated single-asset path — fast, ~3–10 s. See
+> consolidated single-asset path — fast, ~10 s for all 5 grades. See
 > [`Docs/RESCUE_FROM_DB_HANG.md`](Docs/RESCUE_FROM_DB_HANG.md) for the
 > full perf rationale and recovery if the editor previously hung on the
 > old un-batched build.
@@ -543,7 +559,7 @@ no‑ops — gameplay is never blocked by missing VFX assets.
 - **(FIXED) `Build Default Database` could hang Unity on macOS.** The
   previous implementation created ~570 individual `.asset` files
   without batching the AssetDatabase. The current implementation builds
-  ONE consolidated asset in 3–10 seconds. See
+  ONE consolidated asset in ~10 seconds. See
   [`Docs/RESCUE_FROM_DB_HANG.md`](Docs/RESCUE_FROM_DB_HANG.md) for
   recovery steps if you ran the old version.
 - **Haptics on iOS** use `Handheld.Vibrate()` because the project must ship
