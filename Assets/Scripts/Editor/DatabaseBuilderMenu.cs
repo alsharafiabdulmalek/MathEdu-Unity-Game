@@ -161,10 +161,16 @@ namespace MathEdu.EditorTools
                 db.name = "MathDatabase";
                 AssetDatabase.CreateAsset(db, ResDbPath);
 
-                int approxTotalLevels = 3 * 9 * QuestionGenerator.LevelsPerSubject;
+                // Rough upper bound for the progress bar. Real count comes
+                // from QuestionGenerator.SubjectsFor() per grade.
+                int approxTotalLevels =
+                    (DatabaseBootstrapper.MaxGrade - DatabaseBootstrapper.MinGrade + 1)
+                    * 10 * QuestionGenerator.LevelsPerSubject;
                 int builtLevels = 0;
 
-                for (int gradeNum = 1; gradeNum <= 3 && !cancelled; gradeNum++)
+                for (int gradeNum = DatabaseBootstrapper.MinGrade;
+                     gradeNum <= DatabaseBootstrapper.MaxGrade && !cancelled;
+                     gradeNum++)
                 {
                     var grade = ScriptableObject.CreateInstance<GradeData>();
                     grade.name        = $"Grade_{gradeNum}";
@@ -384,6 +390,12 @@ namespace MathEdu.EditorTools
         [MenuItem("MathEdu/Advanced/Per-Grade Assets/Build Grade 3 Files", priority = 102)]
         public static void BuildGrade3Files() => BuildPerGradeAssets(3);
 
+        [MenuItem("MathEdu/Advanced/Per-Grade Assets/Build Grade 4 Files", priority = 103)]
+        public static void BuildGrade4Files() => BuildPerGradeAssets(4);
+
+        [MenuItem("MathEdu/Advanced/Per-Grade Assets/Build Grade 5 Files", priority = 104)]
+        public static void BuildGrade5Files() => BuildPerGradeAssets(5);
+
         [MenuItem("MathEdu/Advanced/Per-Grade Assets/Rebuild Master Index", priority = 110)]
         public static void RebuildMasterIndex()
         {
@@ -402,7 +414,8 @@ namespace MathEdu.EditorTools
                 }
                 db.grades.Clear();
 
-                for (int gradeNum = 1; gradeNum <= 3; gradeNum++)
+                for (int gradeNum = DatabaseBootstrapper.MinGrade;
+                     gradeNum <= DatabaseBootstrapper.MaxGrade; gradeNum++)
                 {
                     string gradePath = $"{Root}/Grades/Grade{gradeNum}/Grade_{gradeNum}.asset";
                     var grade = AssetDatabase.LoadAssetAtPath<GradeData>(gradePath);
@@ -611,6 +624,50 @@ namespace MathEdu.EditorTools
         public static void BuildG3Time()           => BuildOneSubject(3, MathSubject.Time);
         [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 3 - Money",           priority = 168)]
         public static void BuildG3Money()          => BuildOneSubject(3, MathSubject.Money);
+
+        // ----- Grade 4 (10 subjects) -----
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Addition",        priority = 180)]
+        public static void BuildG4Addition()       => BuildOneSubject(4, MathSubject.Addition);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Subtraction",     priority = 181)]
+        public static void BuildG4Subtraction()    => BuildOneSubject(4, MathSubject.Subtraction);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Multiplication",  priority = 182)]
+        public static void BuildG4Multiplication() => BuildOneSubject(4, MathSubject.Multiplication);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Division",        priority = 183)]
+        public static void BuildG4Division()       => BuildOneSubject(4, MathSubject.Division);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Shapes",          priority = 184)]
+        public static void BuildG4Shapes()         => BuildOneSubject(4, MathSubject.Shapes);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Patterns",        priority = 185)]
+        public static void BuildG4Patterns()       => BuildOneSubject(4, MathSubject.Patterns);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Fractions",       priority = 186)]
+        public static void BuildG4Fractions()      => BuildOneSubject(4, MathSubject.Fractions);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Measurement",     priority = 187)]
+        public static void BuildG4Measurement()    => BuildOneSubject(4, MathSubject.Measurement);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Time",            priority = 188)]
+        public static void BuildG4Time()           => BuildOneSubject(4, MathSubject.Time);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 4 - Money",           priority = 189)]
+        public static void BuildG4Money()          => BuildOneSubject(4, MathSubject.Money);
+
+        // ----- Grade 5 (10 subjects) -----
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Addition",        priority = 200)]
+        public static void BuildG5Addition()       => BuildOneSubject(5, MathSubject.Addition);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Subtraction",     priority = 201)]
+        public static void BuildG5Subtraction()    => BuildOneSubject(5, MathSubject.Subtraction);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Multiplication",  priority = 202)]
+        public static void BuildG5Multiplication() => BuildOneSubject(5, MathSubject.Multiplication);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Division",        priority = 203)]
+        public static void BuildG5Division()       => BuildOneSubject(5, MathSubject.Division);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Shapes",          priority = 204)]
+        public static void BuildG5Shapes()         => BuildOneSubject(5, MathSubject.Shapes);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Patterns",        priority = 205)]
+        public static void BuildG5Patterns()       => BuildOneSubject(5, MathSubject.Patterns);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Fractions",       priority = 206)]
+        public static void BuildG5Fractions()      => BuildOneSubject(5, MathSubject.Fractions);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Measurement",     priority = 207)]
+        public static void BuildG5Measurement()    => BuildOneSubject(5, MathSubject.Measurement);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Time",            priority = 208)]
+        public static void BuildG5Time()           => BuildOneSubject(5, MathSubject.Time);
+        [MenuItem("MathEdu/Advanced/Per-Subject Assets/Grade 5 - Money",           priority = 209)]
+        public static void BuildG5Money()          => BuildOneSubject(5, MathSubject.Money);
 
         /// <summary>
         /// Builds (or rebuilds) per-level .asset files for exactly one
