@@ -15,6 +15,7 @@
 using System;
 using System.Collections;
 using MathEdu.Managers;
+using MathEdu.Utility;
 using TMPro;
 using UnityEngine;
 
@@ -112,7 +113,11 @@ namespace MathEdu.UI
             int s = Mathf.CeilToInt(_remaining);
             int m = s / 60;
             int sec = s % 60;
-            if (_label != null) _label.text = $"{m:00}:{sec:00}";
+            // Route the "mm:ss" string through Localization.SetText so the
+            // digits get LRE/PDF-wrapped in Arabic mode. Without that the
+            // RTL flag would render "00:30" as "30:00" (or worse) inside
+            // the right-to-left flow.
+            if (_label != null) Localization.SetText(_label, $"{m:00}:{sec:00}");
             if (_bar == null) return;
 
             float frac = _duration > 0 ? Mathf.Clamp01(_remaining / _duration) : 0;
