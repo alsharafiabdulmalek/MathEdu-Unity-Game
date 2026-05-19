@@ -301,7 +301,15 @@ namespace MathEdu.Gameplay
             // Question prompts come from QuestionStrings in raw logical-order
             // Arabic; shape them here so TMP renders connected glyphs.
             Localization.SetText(_questionLabel, q.prompt);
-            _visual.Show(q);
+            // The visual renderer might throw on malformed payloads (e.g. a
+            // ScriptableObject authored by hand with the wrong visualPayload
+            // length). Catch and continue so the question itself still
+            // renders — better a missing pie chart than a black screen.
+            try { _visual.Show(q); }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[Gameplay] Visual renderer threw on Q{index}: {e.Message}");
+            }
             UpdateHeader();
 
             for (int i = _answersHolder.childCount - 1; i >= 0; i--)
