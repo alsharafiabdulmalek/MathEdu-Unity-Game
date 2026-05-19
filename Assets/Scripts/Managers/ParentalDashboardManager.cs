@@ -74,7 +74,7 @@ namespace MathEdu.Managers
             var header = UIFactory.CreatePanel(_gatePanel,
                 new Vector2(0, 0.88f), new Vector2(1, 1f),
                 new Color(0.30f, 0.35f, 0.45f), 0, "Header");
-            UIFactory.CreateText(header, "Parental Dashboard", 56,
+            UIFactory.CreateText(header, Localization.T("parental.title"), 56,
                 Color.white, TextAlignmentOptions.Center, "Title").fontStyle = FontStyles.Bold;
 
             var back = IconService.IconButton(header, "back", "<", new Color(0, 0, 0, 0.35f), "Back");
@@ -98,11 +98,11 @@ namespace MathEdu.Managers
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "🔒 For Parents", 64,
+            UIFactory.CreateText((RectTransform)col.transform, Localization.T("parental.for_parents"), 64,
                 UIFactory.TextDark, TextAlignmentOptions.Center, "Lbl")
                 .fontStyle = FontStyles.Bold;
             UIFactory.CreateText((RectTransform)col.transform,
-                "Enter your PIN. Default is 0000.", 28,
+                Localization.T("parental.enter_pin"), 28,
                 UIFactory.TextDark, TextAlignmentOptions.Center, "Sub");
 
             // PIN dots row
@@ -259,7 +259,7 @@ namespace MathEdu.Managers
             while (remaining > 0 && _locked)
             {
                 if (_lockoutLabel != null)
-                    _lockoutLabel.text = $"Try again in {remaining} s";
+                    Localization.SetText(_lockoutLabel, Localization.T("parental.try_again_n", remaining));
                 yield return new WaitForSecondsRealtime(1f);
                 remaining--;
             }
@@ -302,7 +302,7 @@ namespace MathEdu.Managers
                 new Vector2(0, 0.92f), new Vector2(1, 1f),
                 new Color(0.30f, 0.35f, 0.45f), 0, "Header");
             UIFactory.CreateText(header,
-                $"{_profile.playerName}'s Progress", 48,
+                Localization.T("parental.progress_format", _profile.playerName), 48,
                 Color.white, TextAlignmentOptions.Center, "Title")
                 .fontStyle = FontStyles.Bold;
 
@@ -341,11 +341,11 @@ namespace MathEdu.Managers
             fle.preferredHeight = 140; fle.minHeight = 140;
 
             var pinBtn = UIFactory.CreateButton((RectTransform)footer.transform,
-                "Change PIN", UIFactory.Primary, 32, "PinBtn");
+                Localization.T("parental.change_pin"), UIFactory.Primary, 32, "PinBtn");
             pinBtn.onClick.AddListener(ChangePinFromDashboard);
 
             var resetBtn = UIFactory.CreateButton((RectTransform)footer.transform,
-                "Reset Progress", UIFactory.Danger, 32, "ResetBtn");
+                Localization.T("parental.reset_progress"), UIFactory.Danger, 32, "ResetBtn");
             resetBtn.onClick.AddListener(ResetProgress);
         }
 
@@ -368,12 +368,12 @@ namespace MathEdu.Managers
             int totalBadges = _profile.badges?.Count ?? 0;
             string playStr  = FormatTime(_profile.totalPlaySeconds);
 
-            AddTile(card, "⭐ Stars",   _profile.totalStars.ToString());
-            AddTile(card, "🎯 XP",      _profile.xp.ToString());
-            AddTile(card, "🏆 Badges",  totalBadges.ToString());
-            AddTile(card, "📚 Levels",  totalLevels.ToString());
-            AddTile(card, "⏱ Time",    playStr);
-            AddTile(card, "🎓 Grade",   _profile.selectedGrade.ToString());
+            AddTile(card, Localization.T("parental.stars"),         _profile.totalStars.ToString());
+            AddTile(card, Localization.T("parental.xp"),            _profile.xp.ToString());
+            AddTile(card, Localization.T("parental.badges_emoji"),  totalBadges.ToString());
+            AddTile(card, Localization.T("parental.levels"),        totalLevels.ToString());
+            AddTile(card, Localization.T("parental.time"),          playStr);
+            AddTile(card, Localization.T("parental.grade"),         _profile.selectedGrade.ToString());
         }
 
         private static void AddTile(RectTransform parent, string label, string value)
@@ -409,7 +409,7 @@ namespace MathEdu.Managers
                 var le = card.gameObject.AddComponent<LayoutElement>();
                 le.preferredHeight = 160; le.minHeight = 160;
                 UIFactory.CreateText(card,
-                    "Accuracy stats appear after the first session.",
+                    Localization.T("parental.accuracy_empty"),
                     30, Color.white, TextAlignmentOptions.Center, "EmptyTxt");
                 return;
             }
@@ -420,7 +420,7 @@ namespace MathEdu.Managers
             chle.preferredHeight = 120 + rows.Count * 80;
             chle.minHeight       = 120 + rows.Count * 80;
 
-            AccuracyBarChart.Spawn(chartHolder, rows, "Accuracy by Subject");
+            AccuracyBarChart.Spawn(chartHolder, rows, Localization.T("parental.accuracy_title"));
         }
 
         private void BuildSubjectTable(RectTransform parent)
@@ -437,7 +437,7 @@ namespace MathEdu.Managers
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "Subject Details", 40,
+            UIFactory.CreateText((RectTransform)col.transform, Localization.T("parental.subject_details"), 40,
                 Color.white, TextAlignmentOptions.Left, "Title").fontStyle = FontStyles.Bold;
 
             BuildTableHeader((RectTransform)col.transform);
@@ -445,7 +445,7 @@ namespace MathEdu.Managers
             if (_profile.subjectStats.Count == 0)
             {
                 UIFactory.CreateText((RectTransform)col.transform,
-                    "No subjects played yet.", 28,
+                    Localization.T("parental.no_subjects"), 28,
                     Color.white, TextAlignmentOptions.Center, "Empty");
                 return;
             }
@@ -464,7 +464,14 @@ namespace MathEdu.Managers
             var le = row.GetComponent<LayoutElement>();
             le.preferredHeight = 50;
 
-            string[] cols = { "Subject", "Q", "Correct", "Stars", "Levels", "Time" };
+            string[] cols = {
+                Localization.T("parental.tbl_subject"),
+                Localization.T("parental.tbl_q"),
+                Localization.T("parental.tbl_correct"),
+                Localization.T("parental.tbl_stars"),
+                Localization.T("parental.tbl_levels"),
+                Localization.T("parental.tbl_time")
+            };
             foreach (var c in cols)
             {
                 var t = UIFactory.CreateText((RectTransform)row.transform, c, 26,
@@ -510,13 +517,13 @@ namespace MathEdu.Managers
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "Badges", 40,
+            UIFactory.CreateText((RectTransform)col.transform, Localization.T("parental.badges_title"), 40,
                 Color.white, TextAlignmentOptions.Left, "Title").fontStyle = FontStyles.Bold;
 
             if (_profile.badges == null || _profile.badges.Count == 0)
             {
                 UIFactory.CreateText((RectTransform)col.transform,
-                    "No badges yet — earn one by clearing a level!",
+                    Localization.T("parental.no_badges"),
                     26, Color.white, TextAlignmentOptions.Center, "Empty");
                 return;
             }
@@ -550,7 +557,7 @@ namespace MathEdu.Managers
             crt.anchorMin = Vector2.zero; crt.anchorMax = Vector2.one;
             crt.offsetMin = Vector2.zero; crt.offsetMax = Vector2.zero;
 
-            UIFactory.CreateText((RectTransform)col.transform, "Grade Completion", 40,
+            UIFactory.CreateText((RectTransform)col.transform, Localization.T("parental.grade_completion"), 40,
                 Color.white, TextAlignmentOptions.Left, "Title").fontStyle = FontStyles.Bold;
 
             var db = GameManager.Instance.database;
@@ -572,7 +579,7 @@ namespace MathEdu.Managers
                     }
                 }
                 float pct = total > 0 ? 100f * done / total : 0f;
-                rows.Add(($"Grade {g.gradeNumber}", pct, g.themeColor));
+                rows.Add((Localization.T("parental.grade_n", g.gradeNumber), pct, g.themeColor));
             }
             AccuracyBarChart.Spawn(holder, rows, "");
         }
@@ -602,6 +609,10 @@ namespace MathEdu.Managers
         private static string PrettySubject(string key)
         {
             if (string.IsNullOrEmpty(key)) return "?";
+            // Route through QuestionGenerator.Pretty so Arabic players see
+            // localized subject names in the table and accuracy chart.
+            if (System.Enum.TryParse<MathSubject>(key, ignoreCase: true, out var subj))
+                return MathEdu.Utility.QuestionGenerator.Pretty(subj);
             return char.ToUpper(key[0]) + key.Substring(1);
         }
 
@@ -627,8 +638,8 @@ namespace MathEdu.Managers
         private void ChangePinFromDashboard()
         {
             PasswordDialog.Show(
-                "New Parental PIN",
-                "Pick a 4-8 digit PIN.",
+                Localization.T("parental.new_pin"),
+                Localization.T("parental.pick_pin"),
                 onSubmit: pin =>
                 {
                     if (string.IsNullOrEmpty(pin) || pin.Length < 4)
@@ -645,8 +656,8 @@ namespace MathEdu.Managers
         private void ResetProgress()
         {
             PasswordDialog.Show(
-                "Confirm Reset",
-                "Type the parental PIN to wipe all progress.",
+                Localization.T("parental.reset_confirm_title"),
+                Localization.T("parental.reset_confirm_body"),
                 onSubmit: pin =>
                 {
                     if (pin == _profile.parentalPin)
